@@ -55,10 +55,7 @@ class PlayState extends FlxState
 		data = cast musicSrc.buffer.data;
 
 		trace(musicSrc.buffer.sampleRate);
-
-		trace("finished samples!!");
-		// trace(arr.length);
-		// trace(arr);
+		fs = musicSrc.buffer.sampleRate;
 
 		grpBars = new FlxTypedGroup<FlxSprite>();
 		add(grpBars);
@@ -71,7 +68,7 @@ class PlayState extends FlxState
 			grpBars.add(spr);
 		}
 
-		freqStuff = getFreqStuff(musicSrc.buffer.sampleRate);
+		// freqStuff = getFreqStuff(musicSrc.buffer.sampleRate);
 
 		// trace(freqStuff.notes.length);
 		// trace(freqStuff.span);
@@ -82,30 +79,31 @@ class PlayState extends FlxState
 	// todo
 	// create this melody every frame, and only for the length of a frame (x amount of fftN samples or whateva)
 	// dynamic bars and shiiit)
+	// identical to getFreqStuff, but returns a single melody
+
+	function getFreqRealtime(fs:Float, index:Int):Melody
+	{
+		var melody:Melody = {notes: [], span: hop};
+
+		final freqs = stft(index, fftN, fs);
+		for (k => s in freqs)
+		{
+			// convert amplitude to decibels
+			// Math.log10 isn't available
+			// creates a log10 function using Math.log, since it returns euler's number
+			var log10 = function(x:Float):Float
+			{
+				return Math.log(x) / Math.log(10);
+			};
+
+			melody.notes.push({pitch: indexToFreq(k), amplitude: 20 * log10(s / 32768)});
+		}
+
+		return melody;
+	}
 
 	function getFreqStuff(fs:Float):Array<Melody>
 	{
-		final fftN = 4096;
-		final overlap = 0.5;
-		final hop = Std.int(fftN * (1 - overlap));
-
-		final a0 = 0.50; // => Hann(ing) window
-		final window = (n:Int) -> a0 - (1 - a0) * Math.cos(2 * Math.PI * n / fftN);
-
-		// helpers
-		final binSizeHz = fs / fftN;
-		final indexToFreq = (k:Int) -> 1.0 * k * binSizeHz; // we need the '1.0' to avoid overflows
-		final indexToTime = (n:Int) -> n / fs;
-
-		// computes an STFT frame, starting at the given index within input samples
-		final stft = function(c:Int)
-		{
-			return [
-				for (n in 0...fftN)
-					c + n < Std.int(data.length / 4) ? data[Std.int((c + n) * 4)] : 0.0
-			].mapi((n, x) -> x * window(n)).rfft().map(z -> z.scale(1 / fs).magnitude);
-		}
-
 		var melody = new Array<Note>();
 		var c = 0;
 
@@ -113,7 +111,7 @@ class PlayState extends FlxState
 
 		while (c < data.length / 4)
 		{
-			final freqs = stft(c);
+			final freqs = stft(c, fftN, fs);
 			// trace(indexToTime(c));
 			// trace(freqs.length);
 
@@ -140,8 +138,6 @@ class PlayState extends FlxState
 				melody.push({pitch: indexToFreq(k), amplitude: 20 * log10(s / 32768)});
 			}
 
-			// trace(melody);
-
 			melodyList.push({notes: melody, span: hop});
 			melody = [];
 
@@ -159,25 +155,28 @@ class PlayState extends FlxState
 
 	var max:Float = 0;
 	var maxHeight:Float = 0;
+	var prevIndex:Int = 0;
 
 	override public function update(elapsed:Float)
 	{
-		for (ind => bar in grpBars.members)
+		var remappedIndex:Int = Std.int(FlxMath.remapToRange(FlxG.sound.music.time, 0, FlxG.sound.music.length, 0, data.length / 4));
+
+		if (prevIndex != remappedIndex)
 		{
-			var remappedIndex:Int = Std.int(FlxMath.remapToRange(FlxG.sound.music.time, 0, FlxG.sound.music.length, 0, freqStuff.length));
+			prevIndex = remappedIndex;
 
-			// a function to run ind through that will convert / remap it to get the proper frequency, taking into account exponential growth of music frequencies
-			var freq:Float = Math.pow(10, (ind / grpBars.members.length) * 4) * 20;
+			var melody:Melody = getFreqRealtime(fs, remappedIndex);
+			for (ind => bar in grpBars.members)
+			{
+				// a function to run ind through that will convert / remap it to get the proper frequency, taking into account exponential growth of music frequencies
+				var freq:Float = Math.pow(10, (ind / grpBars.members.length) * 4) * 20;
+				var remappedFreq:Int = Std.int(FlxMath.remapToRange(freq, 0, Math.pow(10, 4) * 20, 0, melody.notes.length));
+				var curIndex = melody.notes[remappedFreq].amplitude;
 
-			var remappedFreq:Int = Std.int(FlxMath.remapToRange(freq, 0, Math.pow(10, 4) * 20, 0, freqStuff[remappedIndex].notes.length));
+				var scaleShit = FlxMath.remapToRange(curIndex, -100, 0, 0, 1);
 
-			var curIndex = freqStuff[remappedIndex].notes[remappedFreq].amplitude;
-
-			maxHeight = Math.max(maxHeight, curIndex);
-
-			var scaleShit = FlxMath.remapToRange(curIndex, -100, 0, 0, 1);
-
-			bar.scale.y = scaleShit;
+				bar.scale.y = scaleShit;
+			}
 		}
 
 		var curIndex = Math.floor(musicSrc.buffer.sampleRate * (FlxG.sound.music.time / 1000));
@@ -200,5 +199,49 @@ class PlayState extends FlxState
 	{
 		debugText.text += "\n";
 		debugText.text += "" + text;
+	}
+
+	// write a nice lil comment block here that nicely shows that below is the FFT type section of code lol
+	// FFT STUFF BELOW
+	// FFT STUFF BELOW
+	// the songs sample rate... set to 44100 for now
+	var fs:Float = 44100;
+	final fftN = 4096;
+	final overlap = 0.5;
+	var hop(get, never):Int;
+
+	function get_hop():Int
+	{
+		return Std.int(fftN * (1 - overlap));
+	}
+
+	final a0 = 0.50; // => Hann(ing) window
+
+	/**
+	 * FFT window function
+	 * @param n idk what this is lol
+	 */
+	function window(n:Int)
+		return a0 - (1 - a0) * Math.cos(2 * Math.PI * n / fftN);
+
+	// helpers
+	var binSizeHz(get, never):Float;
+
+	function get_binSizeHz():Float
+		return fs / fftN;
+
+	function indexToFreq(k:Int)
+		return 1.0 * k * binSizeHz; // we need the '1.0' to avoid overflows
+
+	function indexToTime(n:Int)
+		return n / fs;
+
+	// computes an STFT frame, starting at the given index within input samples
+	function stft(c:Int, fftN:Int = 4096, fs:Float)
+	{
+		return [
+			for (n in 0...fftN)
+				c + n < Std.int(data.length / 4) ? data[Std.int((c + n) * 4)] : 0.0
+		].mapi((n, x) -> x * window(n)).rfft().map(z -> z.scale(1 / fs).magnitude);
 	}
 }
