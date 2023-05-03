@@ -47,7 +47,7 @@ class PlayState extends FlxState
 	{
 		super.create();
 
-		FlxG.sound.playMusic(AssetPaths.shoreline__ogg);
+		FlxG.sound.playMusic("assets/music/copyrightlol/chai.ogg");
 
 		@:privateAccess
 		musicSrc = cast FlxG.sound.music._channel.__source;
@@ -60,7 +60,7 @@ class PlayState extends FlxState
 		grpBars = new FlxTypedGroup<FlxSprite>();
 		add(grpBars);
 
-		var barCount:Int = 64;
+		var barCount:Int = 128;
 
 		for (i in 0...barCount)
 		{
@@ -173,7 +173,10 @@ class PlayState extends FlxState
 				var remappedFreq:Int = Std.int(FlxMath.remapToRange(freq, 0, Math.pow(10, 4) * 20, 0, melody.notes.length));
 				var curIndex = melody.notes[remappedFreq].amplitude;
 
-				var scaleShit = FlxMath.remapToRange(curIndex, -100, 0, 0, 1);
+				curIndex = Math.max(curIndex, -60);
+				curIndex = Math.min(curIndex, -15);
+
+				var scaleShit = FlxMath.remapToRange(curIndex, -60, -15, 0, 1);
 
 				bar.scale.y = scaleShit;
 			}
