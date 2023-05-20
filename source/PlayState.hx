@@ -47,7 +47,7 @@ class PlayState extends FlxState
 	{
 		super.create();
 
-		FlxG.sound.playMusic("assets/music/copyrightlol/chai.ogg");
+		FlxG.sound.playMusic("assets/music/shoreline.ogg");
 
 		@:privateAccess
 		musicSrc = cast FlxG.sound.music._channel.__source;
@@ -60,7 +60,7 @@ class PlayState extends FlxState
 		grpBars = new FlxTypedGroup<FlxSprite>();
 		add(grpBars);
 
-		var barCount:Int = 128;
+		var barCount:Int = 32;
 
 		for (i in 0...barCount)
 		{
@@ -125,16 +125,16 @@ class PlayState extends FlxState
 
 			// trace(indexToFreq(pi));
 			// trace("\t" + freqs[pi]);
+
+			// Math.log10 isn't available
+			// creates a log10 function using Math.log, since it returns euler's number
+			var log10 = function(x:Float):Float
+			{
+				return Math.log(x) / Math.log(10);
+			};
+
 			for (k => s in freqs)
 			{
-				// convert amplitude to decibels
-				// Math.log10 isn't available
-				// creates a log10 function using Math.log, since it returns euler's number
-				var log10 = function(x:Float):Float
-				{
-					return Math.log(x) / Math.log(10);
-				};
-
 				melody.push({pitch: indexToFreq(k), amplitude: 20 * log10(s / 32768)});
 			}
 
