@@ -169,10 +169,20 @@ class PlayState extends FlxState
 			for (ind => bar in grpBars.members)
 			{
 				// a function to run ind through that will convert / remap it to get the proper frequency, taking into account exponential growth of music frequencies
-				var freq:Float = (Math.pow(10, ((ind / grpBars.members.length) * 5)) * 2);
+				// var freq:Float = (Math.pow(10, ((ind / grpBars.members.length) * 4)) * 2);
+
+				var min:Float = 20;
+				var max:Float = 20000;
+				var linearFactor:Float = 10;
+
+				var exponentialPart:Float = Math.pow(10, (4 * ind / grpBars.members.length)) * 2;
+				var linearPart:Float = linearFactor * ind;
+				var correctionFactor:Float = max / (max + linearFactor * grpBars.members.length);
+				var scalingFactor:Float = (max - min) / max;
+				var highpassFreq = (exponentialPart + linearPart) * correctionFactor * scalingFactor + min;
 				// var freqNext:Float = Math.pow(10, (Math.min(((ind + 1) / grpBars.members.length), 1) * 4)) * 22;
 
-				var remappedFreq:Int = Std.int(FlxMath.remapToRange(freq, 0, (Math.pow(10, 5) * 2), 0, melody.notes.length));
+				var remappedFreq:Int = Std.int(FlxMath.remapToRange(highpassFreq, 0, (Math.pow(10, 4) * 2), 0, melody.notes.length));
 				// var remappedFreqNext:Int = Std.int(FlxMath.remapToRange(freqNext, 0, Math.pow(10, 4) * 22, 0, melody.notes.length));
 
 				// var slicedNotes = melody.notes.slice(remappedFreq, remappedFreqNext);
