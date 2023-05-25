@@ -68,10 +68,6 @@ class PlayState extends FlxState
 			grpBars.add(spr);
 		}
 
-		// freqStuff = getFreqStuff(musicSrc.buffer.sampleRate);
-
-		// trace(freqStuff.notes.length);
-		// trace(freqStuff.span);
 		debugText = new FlxText(0, 0, 0, "test", 24);
 		// add(debugText);
 	}
@@ -101,6 +97,14 @@ class PlayState extends FlxState
 
 		return melody;
 	}
+
+	function freqToBin(freq)
+	{
+		return Math.round(freq * fftN / fs);
+	}
+
+	function binToFreq(bin)
+		return bin * fs / fftN;
 
 	function getFreqStuff(fs:Float):Array<Melody>
 	{
@@ -176,13 +180,15 @@ class PlayState extends FlxState
 				var linearFactor:Float = 10;
 
 				var exponentialPart:Float = Math.pow(10, (4 * ind / grpBars.members.length)) * 2;
+
 				var linearPart:Float = linearFactor * ind;
 				var correctionFactor:Float = max / (max + linearFactor * grpBars.members.length);
 				var scalingFactor:Float = (max - min) / max;
 				var highpassFreq = (exponentialPart + linearPart) * correctionFactor * scalingFactor + min;
+				var barkFreq = freqScaleBark(highpassFreq);
 				// var freqNext:Float = Math.pow(10, (Math.min(((ind + 1) / grpBars.members.length), 1) * 4)) * 22;
 
-				var remappedFreq:Int = Std.int(FlxMath.remapToRange(highpassFreq, 0, (Math.pow(10, 4) * 2), 0, melody.notes.length));
+				var remappedFreq:Int = Std.int(FlxMath.remapToRange(barkFreq, 0, freqScaleBark(Math.pow(10, 4) * 2), 0, melody.notes.length));
 				// var remappedFreqNext:Int = Std.int(FlxMath.remapToRange(freqNext, 0, Math.pow(10, 4) * 22, 0, melody.notes.length));
 
 				// var slicedNotes = melody.notes.slice(remappedFreq, remappedFreqNext);
@@ -198,7 +204,7 @@ class PlayState extends FlxState
 
 				// curIndex /= slicedNotes.length;
 
-				var minShit:Float = -65;
+				var minShit:Float = -100;
 				var maxShit:Float = -30;
 
 				curIndex = Math.max(curIndex, minShit);
@@ -206,7 +212,7 @@ class PlayState extends FlxState
 
 				var scaleShit = FlxMath.remapToRange(curIndex, minShit, maxShit, 0, 1);
 
-				bar.scale.y = scaleShit;
+				bar.scale.y = FlxMath.lerp(bar.scale.y, scaleShit, 0.5);
 			}
 		}
 
@@ -230,6 +236,11 @@ class PlayState extends FlxState
 	{
 		debugText.text += "\n";
 		debugText.text += "" + text;
+	}
+
+	function freqScaleBark(freq:Float):Float
+	{
+		return (26.81 * freq) / (1960 + freq) - 0.53;
 	}
 
 	// write a nice lil comment block here that nicely shows that below is the FFT type section of code lol
