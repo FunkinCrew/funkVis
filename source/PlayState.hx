@@ -40,8 +40,13 @@ class PlayState extends FlxState
 
 	var debugText:FlxText;
 
+	var bars:Array<BarObject> = [];
 	var grpBars:FlxTypedGroup<FlxSprite>;
 	var freqStuff:Array<Melody>;
+
+	var barCount:Int = 32;
+
+	var energy:EnergyObj;
 
 	override public function create()
 	{
@@ -60,16 +65,61 @@ class PlayState extends FlxState
 		grpBars = new FlxTypedGroup<FlxSprite>();
 		add(grpBars);
 
-		var barCount:Int = 32;
+		energy = {
+			val: 0,
+			peak: 0,
+			hold: 0
+		};
+
+		calcBars();
 
 		for (i in 0...barCount)
 		{
-			var spr:FlxSprite = new FlxSprite((i / barCount) * FlxG.width, 0).makeGraphic(Std.int((1 / barCount) * FlxG.width) - 4, 300, FlxColor.RED);
+			var spr:FlxSprite = new FlxSprite((i / barCount) * FlxG.width, 0).makeGraphic(Std.int((1 / barCount) * FlxG.width) - 4, 1, FlxColor.RED);
 			grpBars.add(spr);
 		}
 
 		debugText = new FlxText(0, 0, 0, "test", 24);
 		// add(debugText);
+	}
+
+	function calcBars()
+	{
+		var barWidth:Float = FlxG.width / barCount;
+
+		var initX:Float = 0;
+		var maxFreq:Float = 20000;
+		var minFreq:Float = 20;
+
+		var scaleMin:Float = freqScaleBark(minFreq);
+		var unitWidth = FlxG.width / (freqScaleBark(maxFreq) - scaleMin);
+
+		var posX:Float = 0;
+		for (i in 0...barCount)
+		{
+			var freqLo:Float = invFreqScaleBark(scaleMin + posX / unitWidth);
+			var freq:Float = invFreqScaleBark(scaleMin + (posX + barWidth / 2) / unitWidth);
+			var freqHi:Float = invFreqScaleBark(scaleMin + (posX + barWidth) / unitWidth);
+
+			var binAndRatioLo:Array<Float> = calcRatio(Std.int(freqLo));
+			var binAndRatioHi:Array<Float> = calcRatio(Std.int(freqHi));
+
+			bars.push({
+				posX: initX + posX,
+				freq: freq,
+				freqLo: freqLo,
+				freqHi: freqHi,
+				binLo: Std.int(binAndRatioLo[0]),
+				binHi: Std.int(binAndRatioHi[0]),
+				ratioLo: binAndRatioLo[1],
+				ratioHi: binAndRatioHi[1],
+				peak: [0, 0],
+				hold: 0,
+				value: 0
+			});
+
+			posX += barWidth;
+		}
 	}
 
 	// todo
@@ -98,13 +148,43 @@ class PlayState extends FlxState
 		return melody;
 	}
 
-	function freqToBin(freq)
+	function freqToBin(freq, mathType:String = 'round'):Int
 	{
-		return Math.round(freq * fftN / fs);
+		var bin = freq * fftN / fs;
+		if (mathType == 'round')
+			return Math.round(bin);
+		else if (mathType == 'floor')
+			return Math.floor(bin);
+		else if (mathType == 'ceil')
+			return Math.ceil(bin);
+		else
+			return Std.int(bin);
 	}
 
 	function binToFreq(bin)
 		return bin * fs / fftN;
+
+	var amplitudes(get, default):Array<Float> = [];
+	var ampIndex:Int = 0;
+
+	function get_amplitudes():Array<Float>
+	{
+		var index:Int = Std.int(FlxMath.remapToRange(FlxG.sound.music.time, 0, FlxG.sound.music.length, 0, data.length / 2));
+		if (ampIndex == index)
+			return amplitudes;
+		else
+			ampIndex = index;
+
+		var lilamp = [];
+		final freqs = stft(index, fftN, fs);
+
+		for (k => s in freqs)
+			lilamp.push(s);
+
+		amplitudes = lilamp;
+
+		return lilamp;
+	}
 
 	function getFreqStuff(fs:Float):Array<Melody>
 	{
@@ -161,6 +241,92 @@ class PlayState extends FlxState
 	var maxHeight:Float = 0;
 	var prevIndex:Int = 0;
 
+	override function draw()
+	{
+		var currentEnergy:Float = 0;
+
+		for (i in 0...bars.length)
+		{
+			var bar = bars[i];
+			var freq = bar.freq;
+			var binLo = bar.binLo;
+			var binHi = bar.binHi;
+			var ratioLo = bar.ratioLo;
+			var ratioHi = bar.ratioHi;
+
+			trace(bar);
+
+			var barHeight:Float = Math.max(interpolate(binLo, ratioLo), interpolate(binHi, ratioHi));
+			// check additional bins (unimplemented?)
+			// check additional bins (if any) for this bar and keep the highest value
+			for (j in binLo + 1...binHi)
+			{
+				if (amplitudes[j] > barHeight)
+					barHeight = amplitudes[j];
+			}
+
+			trace(barHeight);
+
+			// barHeight = normalizedB(barHeight);
+			bar.value = barHeight;
+			currentEnergy += barHeight;
+
+			// using 0 right now for channel
+			if (bar.peak[0] > 0)
+			{
+				bar.hold--;
+				// if hold is negative, it becomes the "acceleration" for peak drop
+				if (bar.hold < 0)
+					bar.peak[0] += bar.hold / 200;
+			}
+
+			if (barHeight >= bar.peak[0])
+			{
+				bar.peak[0] = barHeight;
+				bar.hold = 30; // set peak hold time to 30 frames (0.5s)
+			}
+
+			var peak = bar.peak[0];
+			var posX = bar.posX;
+			if (peak > 0 && posX >= 0 && posX < FlxG.width)
+			{
+				trace(barHeight);
+				grpBars.members[i].scale.y = barHeight * 10;
+			}
+
+			energy.val = currentEnergy / (bars.length << 0);
+			if (energy.val >= energy.peak)
+			{
+				energy.peak = energy.val;
+				energy.hold = 30;
+			}
+			else
+			{
+				if (energy.hold > 0)
+					energy.hold--;
+				else if (energy.peak > 0)
+					energy.peak *= (30 + energy.hold--) / 30;
+			}
+		}
+		super.draw();
+	}
+
+	function normalizedB(value:Float)
+	{
+		var clamp = (val:Float, min, max) -> val <= min ? min : val >= max ? max : val;
+
+		var maxValue = -85;
+		var minValue = -25;
+
+		return clamp((value - minValue) / (maxValue - minValue), 0, 1);
+	}
+
+	function interpolate(bin, ratio:Float)
+	{
+		var value = amplitudes[bin] + (bin < amplitudes.length - 1 ? (amplitudes[bin + 1] - amplitudes[bin]) * ratio : 0);
+		return Math.isNaN(value) ? -Math.NEGATIVE_INFINITY : value;
+	}
+
 	override public function update(elapsed:Float)
 	{
 		var remappedIndex:Int = Std.int(FlxMath.remapToRange(FlxG.sound.music.time, 0, FlxG.sound.music.length, 0, data.length / 2));
@@ -185,7 +351,7 @@ class PlayState extends FlxState
 				var correctionFactor:Float = max / (max + linearFactor * grpBars.members.length);
 				var scalingFactor:Float = (max - min) / max;
 				var highpassFreq = (exponentialPart + linearPart) * correctionFactor * scalingFactor + min;
-				var barkFreq = freqScaleBark(highpassFreq);
+				var barkFreq = freqScaleBark(exponentialPart);
 				// var freqNext:Float = Math.pow(10, (Math.min(((ind + 1) / grpBars.members.length), 1) * 4)) * 22;
 
 				var remappedFreq:Int = Std.int(FlxMath.remapToRange(barkFreq, 0, freqScaleBark(Math.pow(10, 4) * 2), 0, melody.notes.length));
@@ -212,7 +378,7 @@ class PlayState extends FlxState
 
 				var scaleShit = FlxMath.remapToRange(curIndex, minShit, maxShit, 0, 1);
 
-				bar.scale.y = FlxMath.lerp(bar.scale.y, scaleShit, 0.5);
+				// bar.scale.y = FlxMath.lerp(bar.scale.y, scaleShit, 0.5);
 			}
 		}
 
@@ -238,10 +404,25 @@ class PlayState extends FlxState
 		debugText.text += "" + text;
 	}
 
-	function freqScaleBark(freq:Float):Float
+	function calcRatio(freq):Array<Float>
 	{
-		return (26.81 * freq) / (1960 + freq) - 0.53;
+		var bin = freqToBin(freq, 'floor'); // find closest FFT bin
+		var lower = binToFreq(bin);
+		var upper = binToFreq(bin + 1);
+		var ratio = log2(freq / lower) / log2(upper / lower);
+		return [bin, ratio];
 	}
+
+	function log2(x:Float):Float
+	{
+		return Math.log(x) / Math.log(2);
+	}
+
+	function freqScaleBark(freq:Float):Float
+		return (26.81 * freq) / (1960 + freq) - 0.53;
+
+	function invFreqScaleBark(x:Float):Float
+		return 1960 / (26.81 / (x + .53) - 1);
 
 	// write a nice lil comment block here that nicely shows that below is the FFT type section of code lol
 	// FFT STUFF BELOW
@@ -289,4 +470,26 @@ class PlayState extends FlxState
 				c + n < Std.int(data.length) ? data[Std.int((c + n))] : 0.0
 		].mapi((n, x) -> x * blackmanWindow(n)).rfft().map(z -> z.scale(1 / fs).magnitude);
 	}
+}
+
+typedef BarObject =
+{
+	var posX:Float;
+	var freq:Float;
+	var freqLo:Float;
+	var freqHi:Float;
+	var binLo:Int;
+	var binHi:Int;
+	var ratioLo:Float;
+	var ratioHi:Float;
+	var peak:Array<Float>;
+	var hold:Int;
+	var value:Float;
+}
+
+typedef EnergyObj =
+{
+	var val:Float;
+	var peak:Float;
+	var hold:Float;
 }
