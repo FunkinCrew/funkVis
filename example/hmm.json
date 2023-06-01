@@ -9,13 +9,18 @@
       "name": "funkVis",
       "type": "git",
       "dir": "src",
-      "ref": "28c88b4",
+      "ref": "20d51c5",
       "url": "https://github.com/FunkinCrew/funkVis"
     },
     {
       "name": "hxcpp",
       "type": "haxelib",
       "version": "4.3.2"
+    },
+    {
+      "name": "hxcpp-debug-server",
+      "type": "haxelib",
+      "version": "1.2.4"
     },
     {
       "name": "hxdsp",

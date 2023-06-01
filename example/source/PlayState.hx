@@ -15,7 +15,6 @@ import lime.media.vorbis.VorbisFile;
 import lime.utils.Int16Array;
 import sys.io.File;
 
-
 using Lambda;
 using Math;
 using funkVis.dsp.FFT;
@@ -409,10 +408,6 @@ class PlayState extends FlxState
 		var ratio = log2(freq / lower) / log2(upper / lower);
 		return [bin, ratio];
 	}
-
-	
-
-	
 
 	// write a nice lil comment block here that nicely shows that below is the FFT type section of code lol
 	// FFT STUFF BELOW
