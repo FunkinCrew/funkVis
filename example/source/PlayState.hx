@@ -18,8 +18,8 @@ import sys.io.File;
 
 using Lambda;
 using Math;
-using dsp.FFT;
-using dsp.Signal;
+using funkVis.dsp.FFT;
+using funkVis.dsp.Signal;
 
 typedef Note =
 {
