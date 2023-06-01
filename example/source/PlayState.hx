@@ -191,38 +191,19 @@ class PlayState extends FlxState
 		while (c < data.length / 4)
 		{
 			final freqs = stft(c, fftN, fs);
-			// trace(indexToTime(c));
-			// trace(freqs.length);
-
-			// for (k => s in freqs)
-			// trace('${indexToTime(c)}; ${indexToFreq(k)}; ${s}');
-
-			// trace('\n');
-
-			// final peaks = freqs.findPeaks();
-			// final pi = peaks[peaks.map(i -> freqs[i]).maxi()];
-
-			// trace(indexToFreq(pi));
-			// trace("\t" + freqs[pi]);
 
 			for (k => s in freqs)
-			{
 				melody.push({pitch: indexToFreq(k), amplitude: 20 * LogHelper.log10(s / 32768)});
-			}
+			
 
 			melodyList.push({notes: melody, span: hop});
 			melody = [];
-
-			// melody.push({pitch: indexToFreq(pi), amplitude: freqs[pi]});
 			c += hop;
 		}
 
-		// trace('${melody} - ${hop}');
 		for (i in melodyList)
 			trace(i.notes[1000]);
 		return melodyList;
-
-		// trace("swag");
 	}
 
 	var max:Float = 0;
