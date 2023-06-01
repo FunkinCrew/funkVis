@@ -1,10 +1,10 @@
-package dsp;
+package funkvis.dsp;
 
-import dsp.Complex;
+import funkvis.dsp.Complex;
 
 // these are only used for testing, down in FFT.main()
-using dsp.OffsetArray;
-using dsp.Signal;
+using funkvis.dsp.OffsetArray;
+using funkvis.dsp.Signal;
 
 
 /**
