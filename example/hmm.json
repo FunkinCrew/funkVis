@@ -9,7 +9,7 @@
       "name": "funkVis",
       "type": "git",
       "dir": "src",
-      "ref": "f0144e5",
+      "ref": "28c88b4",
       "url": "https://github.com/FunkinCrew/funkVis"
     },
     {
@@ -27,12 +27,12 @@
     {
       "name": "lime",
       "type": "haxelib",
-      "version": "8.0.1"
+      "version": "8.0.2"
     },
     {
       "name": "openfl",
       "type": "haxelib",
-      "version": "9.2.1"
+      "version": "9.2.2"
     }
   ]
 }
