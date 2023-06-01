@@ -3,8 +3,8 @@ package funkvis.dsp;
 import funkvis.dsp.Complex;
 
 // these are only used for testing, down in FFT.main()
-using funkvis.dsp.OffsetArray;
-using funkvis.dsp.Signal;
+using funkVis.dsp.OffsetArray;
+using funkVis.dsp.Signal;
 
 
 /**

@@ -1,4 +1,4 @@
-package funkvis.dsp;
+package funkVis.dsp;
 
 /**
 	Complex number representation.
