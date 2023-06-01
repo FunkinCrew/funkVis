@@ -1,4 +1,4 @@
-package funkvis;
+package funkVis;
 
 class Scaling
 {
