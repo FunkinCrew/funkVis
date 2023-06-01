@@ -1,9 +1,11 @@
 package funkVis;
 
+import funkVis.LogHelper;
+
 class Scaling
 {
     public static function freqScaleMel(freq:Float):Float
-		return log2(1 + freq / 700);
+		return LogHelper.log2(1 + freq / 700);
 
 	public static function invFreqScaleMel(x:Float):Float
 		return 700 * (Math.pow(2, x - 1));
@@ -13,7 +15,4 @@ class Scaling
 
 	public static function invFreqScaleBark(x:Float):Float
 		return 1960 / (26.81 / (x + .53) - 1);
-
-	public static function log10(x:Float):Float
-		return Math.log(x) / Math.log(10);
 }

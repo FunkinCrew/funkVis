@@ -14,6 +14,8 @@ import lime.media.AudioSource;
 import lime.media.vorbis.VorbisFile;
 import lime.utils.Int16Array;
 import sys.io.File;
+import funkVis.Scaling;
+import funkVis.LogHelper;
 
 using Lambda;
 using Math;
@@ -91,15 +93,15 @@ class PlayState extends FlxState
 		var maxFreq:Float = 14000;
 		var minFreq:Float = 30;
 
-		var scaleMin:Float = freqScaleBark(minFreq);
-		var unitWidth = FlxG.width / (freqScaleBark(maxFreq) - scaleMin);
+		var scaleMin:Float = Scaling.freqScaleBark(minFreq);
+		var unitWidth = FlxG.width / (Scaling.freqScaleBark(maxFreq) - scaleMin);
 
 		var posX:Float = 0;
 		for (i in 0...barCount)
 		{
-			var freqLo:Float = invFreqScaleBark(scaleMin + posX / unitWidth);
-			var freq:Float = invFreqScaleBark(scaleMin + (posX + barWidth / 2) / unitWidth);
-			var freqHi:Float = invFreqScaleBark(scaleMin + (posX + barWidth) / unitWidth);
+			var freqLo:Float = Scaling.invFreqScaleBark(scaleMin + posX / unitWidth);
+			var freq:Float = Scaling.invFreqScaleBark(scaleMin + (posX + barWidth / 2) / unitWidth);
+			var freqHi:Float = Scaling.invFreqScaleBark(scaleMin + (posX + barWidth) / unitWidth);
 
 			var binAndRatioLo:Array<Float> = calcRatio(Std.int(freqLo));
 			var binAndRatioHi:Array<Float> = calcRatio(Std.int(freqHi));
@@ -135,7 +137,7 @@ class PlayState extends FlxState
 		for (k => s in freqs)
 		{
 			// convert amplitude to decibels
-			melody.notes.push({pitch: indexToFreq(k), amplitude: 20 * log10(s / 32768)});
+			melody.notes.push({pitch: indexToFreq(k), amplitude: 20 * LogHelper.log10(s / 32768)});
 		}
 
 		return melody;
@@ -203,16 +205,9 @@ class PlayState extends FlxState
 			// trace(indexToFreq(pi));
 			// trace("\t" + freqs[pi]);
 
-			// Math.log10 isn't available
-			// creates a log10 function using Math.log, since it returns euler's number
-			var log10 = function(x:Float):Float
-			{
-				return Math.log(x) / Math.log(10);
-			};
-
 			for (k => s in freqs)
 			{
-				melody.push({pitch: indexToFreq(k), amplitude: 20 * log10(s / 32768)});
+				melody.push({pitch: indexToFreq(k), amplitude: 20 * LogHelper.log10(s / 32768)});
 			}
 
 			melodyList.push({notes: melody, span: hop});
@@ -260,7 +255,7 @@ class PlayState extends FlxState
 
 			trace(barHeight);
 
-			barHeight = 20 * log10(barHeight / 32768); // gets converted to decibels
+			barHeight = 20 * LogHelper.log10(barHeight / 32768); // gets converted to decibels
 			barHeight = normalizedB(barHeight);
 			trace(barHeight);
 			// barHeight += 100;
