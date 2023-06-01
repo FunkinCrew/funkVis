@@ -44,7 +44,7 @@ class PlayState extends FlxState
 	var grpBars:FlxTypedGroup<FlxSprite>;
 	var freqStuff:Array<Melody>;
 
-	var barCount:Int = 32;
+	var barCount:Int = 8;
 
 	var energy:EnergyObj;
 
@@ -88,8 +88,8 @@ class PlayState extends FlxState
 		var barWidth:Float = FlxG.width / barCount;
 
 		var initX:Float = 0;
-		var maxFreq:Float = 20000;
-		var minFreq:Float = 20;
+		var maxFreq:Float = 14000;
+		var minFreq:Float = 30;
 
 		var scaleMin:Float = freqScaleBark(minFreq);
 		var unitWidth = FlxG.width / (freqScaleBark(maxFreq) - scaleMin);
@@ -135,13 +135,6 @@ class PlayState extends FlxState
 		for (k => s in freqs)
 		{
 			// convert amplitude to decibels
-			// Math.log10 isn't available
-			// creates a log10 function using Math.log, since it returns euler's number
-			var log10 = function(x:Float):Float
-			{
-				return Math.log(x) / Math.log(10);
-			};
-
 			melody.notes.push({pitch: indexToFreq(k), amplitude: 20 * log10(s / 32768)});
 		}
 
@@ -267,7 +260,10 @@ class PlayState extends FlxState
 
 			trace(barHeight);
 
-			// barHeight = normalizedB(barHeight);
+			barHeight = 20 * log10(barHeight / 32768); // gets converted to decibels
+			barHeight = normalizedB(barHeight);
+			trace(barHeight);
+			// barHeight += 100;
 			bar.value = barHeight;
 			currentEnergy += barHeight;
 
@@ -290,8 +286,7 @@ class PlayState extends FlxState
 			var posX = bar.posX;
 			if (peak > 0 && posX >= 0 && posX < FlxG.width)
 			{
-				trace(barHeight);
-				grpBars.members[i].scale.y = barHeight * 10;
+				grpBars.members[i].scale.y = barHeight * 600;
 			}
 
 			energy.val = currentEnergy / (bars.length << 0);
@@ -315,9 +310,10 @@ class PlayState extends FlxState
 	{
 		var clamp = (val:Float, min, max) -> val <= min ? min : val >= max ? max : val;
 
-		var maxValue = -85;
-		var minValue = -25;
+		var maxValue = -30;
+		var minValue = -65;
 
+		// return FlxMath.remapToRange(value, minValue, maxValue, 0, 1);
 		return clamp((value - minValue) / (maxValue - minValue), 0, 1);
 	}
 
@@ -329,58 +325,58 @@ class PlayState extends FlxState
 
 	override public function update(elapsed:Float)
 	{
-		var remappedIndex:Int = Std.int(FlxMath.remapToRange(FlxG.sound.music.time, 0, FlxG.sound.music.length, 0, data.length / 2));
+		// var remappedIndex:Int = Std.int(FlxMath.remapToRange(FlxG.sound.music.time, 0, FlxG.sound.music.length, 0, data.length / 2));
 
-		if (prevIndex != remappedIndex)
-		{
-			prevIndex = remappedIndex;
+		// if (prevIndex != remappedIndex)
+		// {
+		// 	prevIndex = remappedIndex;
 
-			var melody:Melody = getFreqRealtime(fs, remappedIndex);
-			for (ind => bar in grpBars.members)
-			{
-				// a function to run ind through that will convert / remap it to get the proper frequency, taking into account exponential growth of music frequencies
-				// var freq:Float = (Math.pow(10, ((ind / grpBars.members.length) * 4)) * 2);
+		// 	var melody:Melody = getFreqRealtime(fs, remappedIndex);
+		// 	for (ind => bar in grpBars.members)
+		// 	{
+		// 		// a function to run ind through that will convert / remap it to get the proper frequency, taking into account exponential growth of music frequencies
+		// 		// var freq:Float = (Math.pow(10, ((ind / grpBars.members.length) * 4)) * 2);
 
-				var min:Float = 20;
-				var max:Float = 20000;
-				var linearFactor:Float = 10;
+		// 		var min:Float = 20;
+		// 		var max:Float = 20000;
+		// 		var linearFactor:Float = 10;
 
-				var exponentialPart:Float = Math.pow(10, (4 * ind / grpBars.members.length)) * 2;
+		// 		var exponentialPart:Float = Math.pow(10, (4 * ind / grpBars.members.length)) * 2;
 
-				var linearPart:Float = linearFactor * ind;
-				var correctionFactor:Float = max / (max + linearFactor * grpBars.members.length);
-				var scalingFactor:Float = (max - min) / max;
-				var highpassFreq = (exponentialPart + linearPart) * correctionFactor * scalingFactor + min;
-				var barkFreq = freqScaleBark(exponentialPart);
-				// var freqNext:Float = Math.pow(10, (Math.min(((ind + 1) / grpBars.members.length), 1) * 4)) * 22;
+		// 		var linearPart:Float = linearFactor * ind;
+		// 		var correctionFactor:Float = max / (max + linearFactor * grpBars.members.length);
+		// 		var scalingFactor:Float = (max - min) / max;
+		// 		var highpassFreq = (exponentialPart + linearPart) * correctionFactor * scalingFactor + min;
+		// 		var barkFreq = freqScaleBark(exponentialPart);
+		// 		// var freqNext:Float = Math.pow(10, (Math.min(((ind + 1) / grpBars.members.length), 1) * 4)) * 22;
 
-				var remappedFreq:Int = Std.int(FlxMath.remapToRange(barkFreq, 0, freqScaleBark(Math.pow(10, 4) * 2), 0, melody.notes.length));
-				// var remappedFreqNext:Int = Std.int(FlxMath.remapToRange(freqNext, 0, Math.pow(10, 4) * 22, 0, melody.notes.length));
+		// 		var remappedFreq:Int = Std.int(FlxMath.remapToRange(barkFreq, 0, freqScaleBark(Math.pow(10, 4) * 2), 0, melody.notes.length));
+		// 		// var remappedFreqNext:Int = Std.int(FlxMath.remapToRange(freqNext, 0, Math.pow(10, 4) * 22, 0, melody.notes.length));
 
-				// var slicedNotes = melody.notes.slice(remappedFreq, remappedFreqNext);
+		// 		// var slicedNotes = melody.notes.slice(remappedFreq, remappedFreqNext);
 
-				if (melody.notes[remappedFreq] == null)
-					remappedFreq = melody.notes.length - 1;
+		// 		if (melody.notes[remappedFreq] == null)
+		// 			remappedFreq = melody.notes.length - 1;
 
-				// averages out the ranges
-				var curIndex:Float = melody.notes[remappedFreq].amplitude;
+		// 		// averages out the ranges
+		// 		var curIndex:Float = melody.notes[remappedFreq].amplitude;
 
-				// for (note in slicedNotes)
-				// curIndex += note.amplitude;
+		// 		// for (note in slicedNotes)
+		// 		// curIndex += note.amplitude;
 
-				// curIndex /= slicedNotes.length;
+		// 		// curIndex /= slicedNotes.length;
 
-				var minShit:Float = -100;
-				var maxShit:Float = -30;
+		// 		var minShit:Float = -100;
+		// 		var maxShit:Float = -30;
 
-				curIndex = Math.max(curIndex, minShit);
-				curIndex = Math.min(curIndex, maxShit);
+		// 		curIndex = Math.max(curIndex, minShit);
+		// 		curIndex = Math.min(curIndex, maxShit);
 
-				var scaleShit = FlxMath.remapToRange(curIndex, minShit, maxShit, 0, 1);
+		// 		var scaleShit = FlxMath.remapToRange(curIndex, minShit, maxShit, 0, 1);
 
-				// bar.scale.y = FlxMath.lerp(bar.scale.y, scaleShit, 0.5);
-			}
-		}
+		// 		// bar.scale.y = FlxMath.lerp(bar.scale.y, scaleShit, 0.5);
+		// 	}
+		// }
 
 		var curIndex = Math.floor(musicSrc.buffer.sampleRate * (FlxG.sound.music.time / 1000));
 		// trace(curIndex / (data.length * 2));
@@ -418,11 +414,20 @@ class PlayState extends FlxState
 		return Math.log(x) / Math.log(2);
 	}
 
+	function freqScaleMel(freq:Float):Float
+		return log2(1 + freq / 700);
+
+	function invFreqScaleMel(x:Float):Float
+		return 700 * (Math.pow(2, x - 1));
+
 	function freqScaleBark(freq:Float):Float
 		return (26.81 * freq) / (1960 + freq) - 0.53;
 
 	function invFreqScaleBark(x:Float):Float
 		return 1960 / (26.81 / (x + .53) - 1);
+
+	function log10(x:Float):Float
+		return Math.log(x) / Math.log(10);
 
 	// write a nice lil comment block here that nicely shows that below is the FFT type section of code lol
 	// FFT STUFF BELOW
@@ -430,7 +435,7 @@ class PlayState extends FlxState
 	// the songs sample rate... set to 44100 for now
 	var fs:Float = 44100;
 	final fftN = 4096;
-	final overlap = 0.0;
+	final overlap = 0.5;
 	var hop(get, never):Int;
 
 	function get_hop():Int
