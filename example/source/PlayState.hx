@@ -400,7 +400,7 @@ class PlayState extends FlxState
 		var bin = freqToBin(freq, 'floor'); // find closest FFT bin
 		var lower = binToFreq(bin);
 		var upper = binToFreq(bin + 1);
-		var ratio = log2(freq / lower) / log2(upper / lower);
+		var ratio = LogHelper.log2(freq / lower) / LogHelper.log2(upper / lower);
 		return [bin, ratio];
 	}
 
