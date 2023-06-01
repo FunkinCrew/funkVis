@@ -15,6 +15,7 @@ import lime.media.vorbis.VorbisFile;
 import lime.utils.Int16Array;
 import sys.io.File;
 
+
 using Lambda;
 using Math;
 using dsp.FFT;
@@ -409,25 +410,9 @@ class PlayState extends FlxState
 		return [bin, ratio];
 	}
 
-	function log2(x:Float):Float
-	{
-		return Math.log(x) / Math.log(2);
-	}
+	
 
-	function freqScaleMel(freq:Float):Float
-		return log2(1 + freq / 700);
-
-	function invFreqScaleMel(x:Float):Float
-		return 700 * (Math.pow(2, x - 1));
-
-	function freqScaleBark(freq:Float):Float
-		return (26.81 * freq) / (1960 + freq) - 0.53;
-
-	function invFreqScaleBark(x:Float):Float
-		return 1960 / (26.81 / (x + .53) - 1);
-
-	function log10(x:Float):Float
-		return Math.log(x) / Math.log(10);
+	
 
 	// write a nice lil comment block here that nicely shows that below is the FFT type section of code lol
 	// FFT STUFF BELOW
