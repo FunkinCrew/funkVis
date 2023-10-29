@@ -22,7 +22,7 @@ import funkVis.dsp.SpectralAnalyzer;
 // using Lambda;
 // using Math;
 // using funkVis.dsp.FFT;
-using funkVis.dsp.Signal;
+// using funkVis.dsp.Signal;
 
 // typedef Note =
 // {
@@ -44,7 +44,7 @@ class AudioClip implements funkVis.AudioClip
 	public function new(audioSource:AudioSource)
 	{
 		var data:lime.utils.UInt16Array = cast audioSource.buffer.data;
-		this.audioBuffer = new funkVis.AudioBuffer(data, audioSource.buffer.sampleRate);
+		this.audioBuffer = new AudioBuffer(data, audioSource.buffer.sampleRate);
 	}
 
 	// public function 
@@ -262,7 +262,7 @@ class PlayState extends FlxState
 		// 	// 		energy.peak *= (30 + energy.hold--) / 30;
 		// 	// }
 		// }
-		// trace(analyzer.getLevels());
+		trace(analyzer.getLevels());
 		super.draw();
 	}
 
