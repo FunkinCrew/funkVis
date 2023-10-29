@@ -14,13 +14,14 @@ import lime.media.AudioSource;
 import lime.media.vorbis.VorbisFile;
 import lime.utils.Int16Array;
 import sys.io.File;
+import funkVis.AudioBuffer;
 import funkVis.Scaling;
 import funkVis.LogHelper;
 import funkVis.dsp.SpectralAnalyzer;
 
-using Lambda;
-using Math;
-using funkVis.dsp.FFT;
+// using Lambda;
+// using Math;
+// using funkVis.dsp.FFT;
 using funkVis.dsp.Signal;
 
 // typedef Note =
@@ -34,6 +35,25 @@ using funkVis.dsp.Signal;
 // 	final notes:Array<Note>;
 // 	final span:Int;
 // }
+
+class AudioClip implements funkVis.AudioClip
+{
+	public var audioBuffer(default, null):AudioBuffer;
+    public var currentFrame(get, never):Int;
+
+	public function new(audioSource:AudioSource)
+	{
+		var data:lime.utils.UInt16Array = cast audioSource.buffer.data;
+		this.audioBuffer = new funkVis.AudioBuffer(data, audioSource.buffer.sampleRate);
+	}
+
+	// public function 
+
+	private function get_currentFrame():Int
+	{
+		return Std.int(FlxMath.remapToRange(FlxG.sound.music.time, 0, FlxG.sound.music.length, 0, audioBuffer.data.length / 2));
+	}
+}
 
 class PlayState extends FlxState
 {
@@ -64,7 +84,7 @@ class PlayState extends FlxState
 
 		data = cast musicSrc.buffer.data;
 
-		analyzer = new SpectralAnalyzer(barCount, new funkVis.AudioBuffer(data, musicSrc.buffer.sampleRate));
+		analyzer = new SpectralAnalyzer(barCount, new AudioClip(musicSrc));
 
 		grpBars = new FlxTypedGroup<FlxSprite>();
 		add(grpBars);
@@ -122,27 +142,27 @@ class PlayState extends FlxState
 	// function binToFreq(bin)
 	// 	return bin * fs / fftN;
 
-	var amplitudes(get, default):Array<Float> = [];
-	var ampIndex:Int = 0;
+	// var amplitudes(get, default):Array<Float> = [];
+	// var ampIndex:Int = 0;
 
-	function get_amplitudes():Array<Float>
-	{
-		var index:Int = Std.int(FlxMath.remapToRange(FlxG.sound.music.time, 0, FlxG.sound.music.length, 0, data.length / 2));
-		if (ampIndex == index)
-			return amplitudes;
-		else
-			ampIndex = index;
+	// function get_amplitudes():Array<Float>
+	// {
+	// 	var index:Int = Std.int(FlxMath.remapToRange(FlxG.sound.music.time, 0, FlxG.sound.music.length, 0, data.length / 2));
+	// 	if (ampIndex == index)
+	// 		return amplitudes;
+	// 	else
+	// 		ampIndex = index;
 
-		var lilamp = [];
-		final freqs = stft(index, fftN, fs);
+	// 	var lilamp = [];
+	// 	final freqs = stft(index, fftN, fs);
 
-		for (k => s in freqs)
-			lilamp.push(s);
+	// 	for (k => s in freqs)
+	// 		lilamp.push(s);
 
-		amplitudes = lilamp;
+	// 	amplitudes = lilamp;
 
-		return lilamp;
-	}
+	// 	return lilamp;
+	// }
 
 	// function getFreqStuff(fs:Float):Array<Melody>
 	// {
@@ -170,97 +190,98 @@ class PlayState extends FlxState
 	// }
 
 	var max:Float = 0;
-	var maxHeight:Float = 0;
-	var prevIndex:Int = 0;
+	// var maxHeight:Float = 0;
+	// var prevIndex:Int = 0;
 
 	override function draw()
 	{
-		var currentEnergy:Float = 0;
+		// var currentEnergy:Float = 0;
 
-		for (i in 0...bars.length)
-		{
-			var bar = bars[i];
-			var freq = bar.freq;
-			var binLo = bar.binLo;
-			var binHi = bar.binHi;
-			var ratioLo = bar.ratioLo;
-			var ratioHi = bar.ratioHi;
+		// for (i in 0...bars.length)
+		// {
+		// 	var bar = bars[i];
+		// 	var freq = bar.freq;
+		// 	var binLo = bar.binLo;
+		// 	var binHi = bar.binHi;
+		// 	var ratioLo = bar.ratioLo;
+		// 	var ratioHi = bar.ratioHi;
 
-			trace(bar);
+		// 	trace(bar);
 
-			var barHeight:Float = Math.max(interpolate(binLo, ratioLo), interpolate(binHi, ratioHi));
-			// check additional bins (unimplemented?)
-			// check additional bins (if any) for this bar and keep the highest value
-			for (j in binLo + 1...binHi)
-			{
-				if (amplitudes[j] > barHeight)
-					barHeight = amplitudes[j];
-			}
+		// 	var barHeight:Float = Math.max(interpolate(binLo, ratioLo), interpolate(binHi, ratioHi));
+		// 	// check additional bins (unimplemented?)
+		// 	// check additional bins (if any) for this bar and keep the highest value
+		// 	for (j in binLo + 1...binHi)
+		// 	{
+		// 		if (amplitudes[j] > barHeight)
+		// 			barHeight = amplitudes[j];
+		// 	}
 
-			trace(barHeight);
+		// 	trace(barHeight);
 
-			barHeight = 20 * LogHelper.log10(barHeight / 32768); // gets converted to decibels
-			barHeight = normalizedB(barHeight);
-			trace(barHeight);
-			// barHeight += 100;
-			bar.value = barHeight;
-			currentEnergy += barHeight;
+		// 	barHeight = 20 * LogHelper.log10(barHeight / 32768); // gets converted to decibels
+		// 	barHeight = normalizedB(barHeight);
+		// 	trace(barHeight);
+		// 	// barHeight += 100;
+		// 	bar.value = barHeight;
+		// 	currentEnergy += barHeight;
 
-			// using 0 right now for channel
-			if (bar.peak[0] > 0)
-			{
-				bar.hold--;
-				// if hold is negative, it becomes the "acceleration" for peak drop
-				if (bar.hold < 0)
-					bar.peak[0] += bar.hold / 200;
-			}
+		// 	// using 0 right now for channel
+		// 	if (bar.peak[0] > 0)
+		// 	{
+		// 		bar.hold--;
+		// 		// if hold is negative, it becomes the "acceleration" for peak drop
+		// 		if (bar.hold < 0)
+		// 			bar.peak[0] += bar.hold / 200;
+		// 	}
 
-			if (barHeight >= bar.peak[0])
-			{
-				bar.peak[0] = barHeight;
-				bar.hold = 30; // set peak hold time to 30 frames (0.5s)
-			}
+		// 	if (barHeight >= bar.peak[0])
+		// 	{
+		// 		bar.peak[0] = barHeight;
+		// 		bar.hold = 30; // set peak hold time to 30 frames (0.5s)
+		// 	}
 
-			var peak = bar.peak[0];
-			var posX = bar.posX;
-			if (peak > 0 && posX >= 0 && posX < FlxG.width)
-			{
-				grpBars.members[i].scale.y = barHeight * 600;
-			}
+		// 	var peak = bar.peak[0];
+		// 	var posX = bar.posX;
+		// 	if (peak > 0 && posX >= 0 && posX < FlxG.width)
+		// 	{
+		// 		grpBars.members[i].scale.y = barHeight * 600;
+		// 	}
 
-			// energy.val = currentEnergy / (bars.length << 0);
-			// if (energy.val >= energy.peak)
-			// {
-			// 	energy.peak = energy.val;
-			// 	energy.hold = 30;
-			// }
-			// else
-			// {
-			// 	if (energy.hold > 0)
-			// 		energy.hold--;
-			// 	else if (energy.peak > 0)
-			// 		energy.peak *= (30 + energy.hold--) / 30;
-			// }
-		}
+		// 	// energy.val = currentEnergy / (bars.length << 0);
+		// 	// if (energy.val >= energy.peak)
+		// 	// {
+		// 	// 	energy.peak = energy.val;
+		// 	// 	energy.hold = 30;
+		// 	// }
+		// 	// else
+		// 	// {
+		// 	// 	if (energy.hold > 0)
+		// 	// 		energy.hold--;
+		// 	// 	else if (energy.peak > 0)
+		// 	// 		energy.peak *= (30 + energy.hold--) / 30;
+		// 	// }
+		// }
+		// trace(analyzer.getLevels());
 		super.draw();
 	}
 
-	function normalizedB(value:Float)
-	{
-		var clamp = (val:Float, min, max) -> val <= min ? min : val >= max ? max : val;
+	// function normalizedB(value:Float)
+	// {
+	// 	var clamp = (val:Float, min, max) -> val <= min ? min : val >= max ? max : val;
 
-		var maxValue = -30;
-		var minValue = -65;
+	// 	var maxValue = -30;
+	// 	var minValue = -65;
 
-		// return FlxMath.remapToRange(value, minValue, maxValue, 0, 1);
-		return clamp((value - minValue) / (maxValue - minValue), 0, 1);
-	}
+	// 	// return FlxMath.remapToRange(value, minValue, maxValue, 0, 1);
+	// 	return clamp((value - minValue) / (maxValue - minValue), 0, 1);
+	// }
 
-	function interpolate(bin, ratio:Float)
-	{
-		var value = amplitudes[bin] + (bin < amplitudes.length - 1 ? (amplitudes[bin + 1] - amplitudes[bin]) * ratio : 0);
-		return Math.isNaN(value) ? -Math.NEGATIVE_INFINITY : value;
-	}
+	// function interpolate(bin, ratio:Float)
+	// {
+	// 	var value = amplitudes[bin] + (bin < amplitudes.length - 1 ? (amplitudes[bin + 1] - amplitudes[bin]) * ratio : 0);
+	// 	return Math.isNaN(value) ? -Math.NEGATIVE_INFINITY : value;
+	// }
 
 	override public function update(elapsed:Float)
 	{
@@ -352,64 +373,64 @@ class PlayState extends FlxState
 	// FFT STUFF BELOW
 	// FFT STUFF BELOW
 	// the songs sample rate... set to 44100 for now
-	var fs:Float = 44100;
-	final fftN = 4096;
-	final overlap = 0.5;
-	var hop(get, never):Int;
+	// var fs:Float = 44100;
+	// final fftN = 4096;
+	// final overlap = 0.5;
+	// var hop(get, never):Int;
 
-	function get_hop():Int
-	{
-		return Std.int(fftN * (1 - overlap));
-	}
+	// function get_hop():Int
+	// {
+	// 	return Std.int(fftN * (1 - overlap));
+	// }
 
-	final a0 = 0.50; // => Hann(ing) window
+	// final a0 = 0.50; // => Hann(ing) window
 
-	/**
-	 * FFT window function
-	 * @param n idk what this is lol
-	 */
-	function window(n:Int)
-		return a0 - (1 - a0) * Math.cos(2 * Math.PI * n / fftN);
+	// /**
+	//  * FFT window function
+	//  * @param n idk what this is lol
+	//  */
+	// function window(n:Int)
+	// 	return a0 - (1 - a0) * Math.cos(2 * Math.PI * n / fftN);
 
-	function blackmanWindow(n:Int)
-		return 0.42 - a0 * Math.cos(2 * Math.PI * n / (fftN - 1)) + 0.08 * Math.cos(4 * Math.PI * n / (fftN - 1));
+	// function blackmanWindow(n:Int)
+	// 	return 0.42 - a0 * Math.cos(2 * Math.PI * n / (fftN - 1)) + 0.08 * Math.cos(4 * Math.PI * n / (fftN - 1));
 
-	// helpers
-	var binSizeHz(get, never):Float;
+	// // helpers
+	// var binSizeHz(get, never):Float;
 
-	function get_binSizeHz():Float
-		return fs / fftN;
+	// function get_binSizeHz():Float
+	// 	return fs / fftN;
 
-	function indexToFreq(k:Int)
-		return 1.0 * k * binSizeHz; // we need the '1.0' to avoid overflows
+	// function indexToFreq(k:Int)
+	// 	return 1.0 * k * binSizeHz; // we need the '1.0' to avoid overflows
 
-	function indexToTime(n:Int)
-		return n / fs;
+	// function indexToTime(n:Int)
+	// 	return n / fs;
 
-	// computes an STFT frame, starting at the given index within input samples
-	function stft(c:Int, fftN:Int = 4096, fs:Float)
-	{
-		return [
-			for (n in 0...fftN)
-				c + n < Std.int(data.length) ? data[Std.int((c + n))] : 0.0
-		].mapi((n, x) -> x * blackmanWindow(n)).rfft().map(z -> z.scale(1 / fs).magnitude);
-	}
+	// // computes an STFT frame, starting at the given index within input samples
+	// function stft(c:Int, fftN:Int = 4096, fs:Float)
+	// {
+	// 	return [
+	// 		for (n in 0...fftN)
+	// 			c + n < Std.int(data.length) ? data[Std.int((c + n))] : 0.0
+	// 	].mapi((n, x) -> x * blackmanWindow(n)).rfft().map(z -> z.scale(1 / fs).magnitude);
+	// }
 }
 
-typedef BarObject =
-{
-	var posX:Float;
-	var freq:Float;
-	var freqLo:Float;
-	var freqHi:Float;
-	var binLo:Int;
-	var binHi:Int;
-	var ratioLo:Float;
-	var ratioHi:Float;
-	var peak:Array<Float>;
-	var hold:Int;
-	var value:Float;
-}
+// typedef BarObject =
+// {
+// 	var posX:Float;
+// 	var freq:Float;
+// 	var freqLo:Float;
+// 	var freqHi:Float;
+// 	var binLo:Int;
+// 	var binHi:Int;
+// 	var ratioLo:Float;
+// 	var ratioHi:Float;
+// 	var peak:Array<Float>;
+// 	var hold:Int;
+// 	var value:Float;
+// }
 
 // typedef EnergyObj =
 // {
