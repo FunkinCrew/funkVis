@@ -4,7 +4,7 @@ import funkVis.AudioClip;
 import funkVis.Scaling;
 
 using Lambda;
-// using Math;
+using Math;
 using funkVis.dsp.FFT;
 
 typedef BarObject =
@@ -34,8 +34,8 @@ class SpectralAnalyzer
     
     public function new(barCount:Int, audioClip:AudioClip)
     {
-        calcBars(barCount);
         this.audioClip = audioClip;
+        calcBars(barCount);
     }
 
     // For second stage, make this return a second set of recent peaks
@@ -95,7 +95,7 @@ class SpectralAnalyzer
 			//	 grpBars.members[i].scale.y = barHeight * 600;
 			// }
 
-            levels.push(barHeight * 600);
+            levels.push(barHeight);
 
 			// energy.val = currentEnergy / (bars.length << 0);
 			// if (energy.val >= energy.peak)
@@ -127,23 +127,23 @@ class SpectralAnalyzer
         // var unitWidth = FlxG.width / (Scaling.freqScaleBark(maxFreq) - scaleMin);
         var stride = Scaling.freqScaleBark(maxFreq) - scaleMin;
 
-        var a:Float = scaleMin + (0 * stride) / barCount;
-        trace(a);
-        var freqLo:Float = Scaling.invFreqScaleBark(a);
-        trace(freqLo);
-        a = scaleMin + ((0+1) * stride) / barCount;
-        trace(a);
-        var freqHi:Float = Scaling.invFreqScaleBark(a);
-        trace(freqHi);
-        var freq:Float = (freqHi + freqLo) / 2.0;
-        trace(freq);
+        // var a:Float = scaleMin + (0 * stride) / barCount;
+        // trace(a);
+        // var freqLo:Float = Scaling.invFreqScaleBark(a);
+        // trace(freqLo);
+        // a = scaleMin + ((0+1) * stride) / barCount;
+        // trace(a);
+        // var freqHi:Float = Scaling.invFreqScaleBark(a);
+        // trace(freqHi);
+        // var freq:Float = (freqHi + freqLo) / 2.0;
+        // trace(freq);
 
-        var binAndRatioLo:Array<Float> = calcRatio(Std.int(freqLo));
-        trace(binAndRatioLo);
-        var binAndRatioHi:Array<Float> = calcRatio(Std.int(freqHi));
-        trace(binAndRatioHi);
+        // var binAndRatioLo:Array<Float> = calcRatio(Std.int(freqLo));
+        // trace(binAndRatioLo);
+        // var binAndRatioHi:Array<Float> = calcRatio(Std.int(freqHi));
+        // trace(binAndRatioHi);
 
-        return;
+        // return;
 
         // var posX:Float = 0;
         for (i in 0...barCount)
