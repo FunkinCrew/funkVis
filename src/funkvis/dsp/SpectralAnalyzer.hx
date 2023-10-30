@@ -71,11 +71,8 @@ class SpectralAnalyzer
 					value = amplitudes[j];
 			}
 
-			trace(value);
-
 			value = 20 * LogHelper.log10(value / 32768); // gets converted to decibels
 			value = normalizedB(value);
-			trace(value);
 			// value += 100;
 			// bar.value = value;
 			// currentEnergy += value;
@@ -99,7 +96,6 @@ class SpectralAnalyzer
 
             // slew limiting
             var delta = clamp(value - bar.value, -1 * maxDelta, maxDelta);
-            trace('i: $i, bar.value: ${bar.value}, delta: $delta and maxDelta: $maxDelta and initial detal ${value - bar.value}');
             bar.value = bar.value + delta;
             levels.push(bar.value);
 
@@ -123,51 +119,22 @@ class SpectralAnalyzer
 
     function calcBars(barCount:Int)
     {
-        // var barWidth:Float = FlxG.width / barCount;
-
-        // var initX:Float = 0;
         var maxFreq:Float = 14000;
         var minFreq:Float = 30;
 
         var scaleMin:Float = Scaling.freqScaleBark(minFreq);
-        // var unitWidth = FlxG.width / (Scaling.freqScaleBark(maxFreq) - scaleMin);
         var stride = Scaling.freqScaleBark(maxFreq) - scaleMin;
 
-        // var a:Float = scaleMin + (0 * stride) / barCount;
-        // trace(a);
-        // var freqLo:Float = Scaling.invFreqScaleBark(a);
-        // trace(freqLo);
-        // a = scaleMin + ((0+1) * stride) / barCount;
-        // trace(a);
-        // var freqHi:Float = Scaling.invFreqScaleBark(a);
-        // trace(freqHi);
-        // var freq:Float = (freqHi + freqLo) / 2.0;
-        // trace(freq);
-
-        // var binAndRatioLo:Array<Float> = calcRatio(Std.int(freqLo));
-        // trace(binAndRatioLo);
-        // var binAndRatioHi:Array<Float> = calcRatio(Std.int(freqHi));
-        // trace(binAndRatioHi);
-
-        // return;
-
-        // var posX:Float = 0;
         for (i in 0...barCount)
         {
-            // i / barCount * (Scaling.freqScaleBark(maxFreq) - scaleMin)
             var freqLo:Float = Scaling.invFreqScaleBark(scaleMin + (i * stride) / barCount);
             var freqHi:Float = Scaling.invFreqScaleBark(scaleMin + ((i+1) * stride) / barCount);
             var freq:Float = (freqHi + freqLo) / 2.0;
-
-            // var freqLo:Float = Scaling.invFreqScaleBark(scaleMin + posX / unitWidth);
-            // var freq:Float = Scaling.invFreqScaleBark(scaleMin + (posX + barWidth / 2) / unitWidth);
-            // var freqHi:Float = Scaling.invFreqScaleBark(scaleMin + (posX + barWidth) / unitWidth);
 
             var binAndRatioLo:Array<Float> = calcRatio(Std.int(freqLo));
             var binAndRatioHi:Array<Float> = calcRatio(Std.int(freqHi));
 
             bars.push({
-                // posX: initX + posX,
                 freq: freq,
                 freqLo: freqLo,
                 freqHi: freqHi,
@@ -179,8 +146,6 @@ class SpectralAnalyzer
                 hold: 0,
                 value: 0
             });
-
-            // posX += barWidth;
         }
     }
 
