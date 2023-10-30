@@ -29,6 +29,14 @@ typedef Bar =
     var peak:Float;
 }
 
+enum MathType
+{
+    Round;
+    Floor;
+    Ceil;
+    Cast;
+}
+
 /**
  * Helper class that can be used to create visualizations for playing audio streams
  */
@@ -69,7 +77,7 @@ class SpectralAnalyzer
 			var ratioLo = bar.ratioLo;
 			var ratioHi = bar.ratioHi;
 
-			trace(bar);
+			// trace(bar);
 
 			var value:Float = Math.max(interpolate(binLo, ratioLo), interpolate(binHi, ratioHi));
 			// check additional bins (unimplemented?)
@@ -167,24 +175,22 @@ class SpectralAnalyzer
 
     function calcRatio(freq):Array<Float>
     {
-        var bin = freqToBin(freq, 'floor'); // find closest FFT bin
+        var bin = freqToBin(freq, Floor); // find closest FFT bin
         var lower = binToFreq(bin);
         var upper = binToFreq(bin + 1);
         var ratio = LogHelper.log2(freq / lower) / LogHelper.log2(upper / lower);
         return [bin, ratio];
     }
 
-    function freqToBin(freq, mathType:String = 'round'):Int
+    function freqToBin(freq, mathType:MathType = Round):Int
     {
         var bin = freq * fftN / audioClip.audioBuffer.sampleRate;
-        if (mathType == 'round')
-            return Math.round(bin);
-        else if (mathType == 'floor')
-            return Math.floor(bin);
-        else if (mathType == 'ceil')
-            return Math.ceil(bin);
-        else
-            return Std.int(bin);
+        return switch (mathType) {
+            case Round: Math.round(bin);
+            case Floor: Math.floor(bin);
+            case Ceil: Math.ceil(bin);
+            case Cast: Std.int(bin);
+        }
     }
 
     function binToFreq(bin)
