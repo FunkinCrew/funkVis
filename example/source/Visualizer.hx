@@ -11,20 +11,25 @@ import funkVis.dsp.SpectralAnalyzer;
 class Visualizer extends FlxGroup
 {
     var grpBars:FlxTypedGroup<FlxSprite>;
+    var peakLines:FlxTypedGroup<FlxSprite>;
     var analyzer:SpectralAnalyzer;
 
     public function new(audioClip:AudioClip, barCount:Int = 8)
     {
         super();
 
-        analyzer = new SpectralAnalyzer(barCount, audioClip, 0.001);
+        analyzer = new SpectralAnalyzer(barCount, audioClip, 0.001, 60);
         grpBars = new FlxTypedGroup<FlxSprite>();
 		add(grpBars);
+        peakLines = new FlxTypedGroup<FlxSprite>();
+        add(peakLines);
 
 		for (i in 0...barCount)
 		{
-			var spr = new FlxSprite((i / barCount) * FlxG.width, 0).makeGraphic(Std.int((1 / barCount) * FlxG.width) - 4, 1, FlxColor.RED);
+			var spr = new FlxSprite((i / barCount) * FlxG.width, 0).makeGraphic(Std.int((1 / barCount) * FlxG.width) - 4, FlxG.height, 0x55ff0000);
 			grpBars.add(spr);
+            spr = new FlxSprite((i / barCount) * FlxG.width, 0).makeGraphic(Std.int((1 / barCount) * FlxG.width) - 4, 1, 0xaaff0000);
+            peakLines.add(spr);
 		}
     }
 
@@ -38,8 +43,9 @@ class Visualizer extends FlxGroup
         var levels = analyzer.getLevels();
 
         for (i in 0...min(grpBars.members.length, levels.length)) {
-            grpBars.members[i].scale.y = levels[i] * FlxG.height;
-            grpBars.members[i].y = FlxG.height - grpBars.members[i].height;
+            grpBars.members[i].scale.y = levels[i].value * 2;
+            grpBars.members[i].y = FlxG.height - grpBars.members[i].height / 2;
+            peakLines.members[i].y = FlxG.height - (levels[i].peak * FlxG.height);
         }
 
         super.draw();

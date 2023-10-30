@@ -17,9 +17,16 @@ typedef BarObject =
 	var binHi:Int;
 	var ratioLo:Float;
 	var ratioHi:Float;
-	var peak:Array<Float>;
-	var hold:Int;
-	var value:Float;
+	// var peak:Array<Float>;
+	// var hold:Int;
+	// var value:Float;
+    var recentValues:Array<Float>;
+}
+
+typedef Bar =
+{
+    var value:Float;
+    var peak:Float;
 }
 
 /**
@@ -32,11 +39,13 @@ class SpectralAnalyzer
 	final fftN = 4096;
     final a0 = 0.50; // => Hann(ing) window
     var maxDelta:Float;
+    var peakHold:Int;
     
-    public function new(barCount:Int, audioClip:AudioClip, maxDelta:Float = 0.01)
+    public function new(barCount:Int, audioClip:AudioClip, maxDelta:Float = 0.01, peakHold:Int = 30)
     {
         this.audioClip = audioClip;
         this.maxDelta = maxDelta;
+        this.peakHold = peakHold;
         calcBars(barCount);
     }
 
@@ -46,9 +55,9 @@ class SpectralAnalyzer
     }
 
     // For second stage, make this return a second set of recent peaks
-    public function getLevels():Array<Float>
+    public function getLevels():Array<Bar>
     {
-        var levels = new Array<Float>();
+        var levels = new Array<Bar>();
         // var currentEnergy:Float = 0;
 
 		for (i in 0...bars.length)
@@ -78,26 +87,32 @@ class SpectralAnalyzer
 			// currentEnergy += value;
 
 			// using 0 right now for channel
-			if (bar.peak[0] > 0)
-			{
-				bar.hold--;
-				// if hold is negative, it becomes the "acceleration" for peak drop
-				if (bar.hold < 0)
-					bar.peak[0] += bar.hold / 200;
-			}
+			// if (bar.peak[0] > 0)
+			// {
+			// 	bar.hold--;
+			// 	// if hold is negative, it becomes the "acceleration" for peak drop
+			// 	if (bar.hold < 0)
+			// 		bar.peak[0] += bar.hold / 200;
+			// }
 
-			if (value >= bar.peak[0])
-			{
-				bar.peak[0] = value;
-				bar.hold = 30; // set peak hold time to 30 frames (0.5s)
-			}
+			// if (value >= bar.peak[0])
+			// {
+			// 	bar.peak[0] = value;
+			// 	bar.hold = 30; // set peak hold time to 30 frames (0.5s)
+			// }
 
-			var peak = bar.peak[0];
+			// var peak = bar.peak[0];
 
             // slew limiting
-            var delta = clamp(value - bar.value, -1 * maxDelta, maxDelta);
-            bar.value = bar.value + delta;
-            levels.push(bar.value);
+            var lastValue = bar.recentValues[bar.recentValues.length - 1];
+            var delta = clamp(value - lastValue, -1 * maxDelta, maxDelta);
+            value = lastValue + delta;
+            bar.recentValues.push(value);
+            if (bar.recentValues.length > peakHold) bar.recentValues.shift();
+
+            var recentPeak = Signal.max(bar.recentValues);
+
+            levels.push({value: value, peak: recentPeak});
 
 			// energy.val = currentEnergy / (bars.length << 0);
 			// if (energy.val >= energy.peak)
@@ -142,9 +157,10 @@ class SpectralAnalyzer
                 binHi: Std.int(binAndRatioHi[0]),
                 ratioLo: binAndRatioLo[1],
                 ratioHi: binAndRatioHi[1],
-                peak: [0, 0],
-                hold: 0,
-                value: 0
+                // peak: [0, 0],
+                // hold: 0,
+                recentValues: [0]
+                // value: 0
             });
         }
     }
