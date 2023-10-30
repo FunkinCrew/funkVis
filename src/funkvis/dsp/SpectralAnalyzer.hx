@@ -19,7 +19,7 @@ typedef BarObject =
 	var ratioHi:Float;
 	var peak:Array<Float>;
 	var hold:Int;
-	// var value:Float;
+	var value:Float;
 }
 
 /**
@@ -31,11 +31,18 @@ class SpectralAnalyzer
     var audioClip:AudioClip;
 	final fftN = 4096;
     final a0 = 0.50; // => Hann(ing) window
+    var maxDelta:Float;
     
-    public function new(barCount:Int, audioClip:AudioClip)
+    public function new(barCount:Int, audioClip:AudioClip, maxDelta:Float = 0.01)
     {
         this.audioClip = audioClip;
+        this.maxDelta = maxDelta;
         calcBars(barCount);
+    }
+
+    static inline function clamp(val:Float, min:Float, max:Float):Float
+    {
+        return val <= min ? min : val >= max ? max : val;
     }
 
     // For second stage, make this return a second set of recent peaks
@@ -55,23 +62,23 @@ class SpectralAnalyzer
 
 			trace(bar);
 
-			var barHeight:Float = Math.max(interpolate(binLo, ratioLo), interpolate(binHi, ratioHi));
+			var value:Float = Math.max(interpolate(binLo, ratioLo), interpolate(binHi, ratioHi));
 			// check additional bins (unimplemented?)
 			// check additional bins (if any) for this bar and keep the highest value
 			for (j in binLo + 1...binHi)
 			{
-				if (amplitudes[j] > barHeight)
-					barHeight = amplitudes[j];
+				if (amplitudes[j] > value)
+					value = amplitudes[j];
 			}
 
-			trace(barHeight);
+			trace(value);
 
-			barHeight = 20 * LogHelper.log10(barHeight / 32768); // gets converted to decibels
-			barHeight = normalizedB(barHeight);
-			trace(barHeight);
-			// barHeight += 100;
-			// bar.value = barHeight;
-			// currentEnergy += barHeight;
+			value = 20 * LogHelper.log10(value / 32768); // gets converted to decibels
+			value = normalizedB(value);
+			trace(value);
+			// value += 100;
+			// bar.value = value;
+			// currentEnergy += value;
 
 			// using 0 right now for channel
 			if (bar.peak[0] > 0)
@@ -82,20 +89,19 @@ class SpectralAnalyzer
 					bar.peak[0] += bar.hold / 200;
 			}
 
-			if (barHeight >= bar.peak[0])
+			if (value >= bar.peak[0])
 			{
-				bar.peak[0] = barHeight;
+				bar.peak[0] = value;
 				bar.hold = 30; // set peak hold time to 30 frames (0.5s)
 			}
 
 			var peak = bar.peak[0];
-			// var posX = bar.posX;
-			// if (peak > 0 && posX >= 0 && posX < FlxG.width)
-			// {
-			//	 grpBars.members[i].scale.y = barHeight * 600;
-			// }
 
-            levels.push(barHeight);
+            // slew limiting
+            var delta = clamp(value - bar.value, -1 * maxDelta, maxDelta);
+            trace('i: $i, bar.value: ${bar.value}, delta: $delta and maxDelta: $maxDelta and initial detal ${value - bar.value}');
+            bar.value = bar.value + delta;
+            levels.push(bar.value);
 
 			// energy.val = currentEnergy / (bars.length << 0);
 			// if (energy.val >= energy.peak)
@@ -171,7 +177,7 @@ class SpectralAnalyzer
                 ratioHi: binAndRatioHi[1],
                 peak: [0, 0],
                 hold: 0,
-                // value: 0
+                value: 0
             });
 
             // posX += barWidth;
@@ -245,8 +251,6 @@ class SpectralAnalyzer
 
     function normalizedB(value:Float)
     {
-        var clamp = (val:Float, min, max) -> val <= min ? min : val >= max ? max : val;
-
         var maxValue = -30;
         var minValue = -65;
 
