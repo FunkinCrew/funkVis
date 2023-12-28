@@ -18,7 +18,7 @@ class Visualizer extends FlxGroup
     {
         super();
 
-        analyzer = new SpectralAnalyzer(barCount, audioClip, 0.001, 60);
+        analyzer = new SpectralAnalyzer(barCount, audioClip, 0.05, 10);
         grpBars = new FlxTypedGroup<FlxSprite>();
 		add(grpBars);
         peakLines = new FlxTypedGroup<FlxSprite>();
@@ -27,6 +27,7 @@ class Visualizer extends FlxGroup
 		for (i in 0...barCount)
 		{
 			var spr = new FlxSprite((i / barCount) * FlxG.width, 0).makeGraphic(Std.int((1 / barCount) * FlxG.width) - 4, FlxG.height, 0x55ff0000);
+            spr.origin.set(0, FlxG.height);
 			grpBars.add(spr);
             spr = new FlxSprite((i / barCount) * FlxG.width, 0).makeGraphic(Std.int((1 / barCount) * FlxG.width) - 4, 1, 0xaaff0000);
             peakLines.add(spr);
@@ -43,9 +44,8 @@ class Visualizer extends FlxGroup
         var levels = analyzer.getLevels();
 
         for (i in 0...min(grpBars.members.length, levels.length)) {
-            grpBars.members[i].scale.y = levels[i].value * 2;
-            grpBars.members[i].y = FlxG.height - grpBars.members[i].height / 2;
-            peakLines.members[i].y = FlxG.height - (levels[i].peak * FlxG.height);
+            grpBars.members[i].scale.y = levels[i].value * .8;
+            peakLines.members[i].y = FlxG.height - (levels[i].peak * FlxG.height) * .8;
         }
 
         super.draw();
