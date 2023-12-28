@@ -20,7 +20,13 @@ typedef BarObject =
 	// var peak:Array<Float>;
 	// var hold:Int;
 	// var value:Float;
-    var recentValues:Array<Float>;
+    var recentValues:RecentPeakFinder;
+}
+
+typedef BinRatio =
+{
+    var bin:Float;
+    var ratio:Float;
 }
 
 typedef Bar =
@@ -45,7 +51,6 @@ class SpectralAnalyzer
     var bars:Array<BarObject> = [];
     var audioClip:AudioClip;
 	final fftN = 4096;
-    final a0 = 0.50; // => Hann(ing) window
     var maxDelta:Float;
     var peakHold:Int;
     
@@ -54,7 +59,7 @@ class SpectralAnalyzer
         this.audioClip = audioClip;
         this.maxDelta = maxDelta;
         this.peakHold = peakHold;
-        calcBars(barCount);
+        calcBars(barCount, peakHold);
     }
 
     static inline function clamp(val:Float, min:Float, max:Float):Float
@@ -78,19 +83,29 @@ class SpectralAnalyzer
 			var ratioHi = bar.ratioHi;
 
 			// trace(bar);
+            var index:Int = audioClip.currentFrame;
+            var indices:Array<Int> = [index];
 
-			var value:Float = Math.max(interpolate(binLo, ratioLo), interpolate(binHi, ratioHi));
-			// check additional bins (unimplemented?)
-			// check additional bins (if any) for this bar and keep the highest value
-			for (j in binLo + 1...binHi)
-			{
-				if (amplitudes[j] > value)
-					value = amplitudes[j];
-			}
+            var halfStride:Int = Std.int(fftN / 2);
+            if (index - halfStride > 0) indices.push(index - halfStride);
+            if (audioClip.audioBuffer.data.length > index + halfStride) indices.push(index + halfStride);
 
-			value = 20 * LogHelper.log10(value / 32768); // gets converted to decibels
-			value = normalizedB(value);
-			// value += 100;
+            var value:Float = 0;
+            for (index in indices) {
+                var amplitudes = stft(index);
+                var interpolated:Float = Math.max(interpolate(amplitudes, binLo, ratioLo), interpolate(amplitudes, binHi, ratioHi));
+                value = Math.max(interpolated, value);
+
+                for (j in binLo + 1...binHi) {
+                    if (amplitudes[j] > value)
+                        value = amplitudes[j];
+                }
+            }
+
+            value = 20 * LogHelper.log10(value / 32768); // gets converted to decibels
+            value = normalizedB(value);
+
+            // value += 100;
 			// bar.value = value;
 			// currentEnergy += value;
 
@@ -112,13 +127,12 @@ class SpectralAnalyzer
 			// var peak = bar.peak[0];
 
             // slew limiting
-            var lastValue = bar.recentValues[bar.recentValues.length - 1];
+            var lastValue = bar.recentValues.lastValue;
             var delta = clamp(value - lastValue, -1 * maxDelta, maxDelta);
             value = lastValue + delta;
             bar.recentValues.push(value);
-            if (bar.recentValues.length > peakHold) bar.recentValues.shift();
 
-            var recentPeak = Signal.max(bar.recentValues);
+            var recentPeak = bar.recentValues.peak;
 
             levels.push({value: value, peak: recentPeak});
 
@@ -137,10 +151,11 @@ class SpectralAnalyzer
 			// }
 		}
 
+        trace(levels);
         return levels;
     }
 
-    function calcBars(barCount:Int)
+    function calcBars(barCount:Int, peakHold:Int)
     {
         var maxFreq:Float = 14000;
         var minFreq:Float = 30;
@@ -154,32 +169,32 @@ class SpectralAnalyzer
             var freqHi:Float = Scaling.invFreqScaleBark(scaleMin + ((i+1) * stride) / barCount);
             var freq:Float = (freqHi + freqLo) / 2.0;
 
-            var binAndRatioLo:Array<Float> = calcRatio(Std.int(freqLo));
-            var binAndRatioHi:Array<Float> = calcRatio(Std.int(freqHi));
+            var binAndRatioLo = calcRatio(Std.int(freqLo));
+            var binAndRatioHi = calcRatio(Std.int(freqHi));
 
             bars.push({
                 freq: freq,
                 freqLo: freqLo,
                 freqHi: freqHi,
-                binLo: Std.int(binAndRatioLo[0]),
-                binHi: Std.int(binAndRatioHi[0]),
-                ratioLo: binAndRatioLo[1],
-                ratioHi: binAndRatioHi[1],
+                binLo: Std.int(binAndRatioLo.bin),
+                binHi: Std.int(binAndRatioHi.bin),
+                ratioLo: binAndRatioLo.ratio,
+                ratioHi: binAndRatioHi.ratio,
                 // peak: [0, 0],
                 // hold: 0,
-                recentValues: [0]
+                recentValues: new RecentPeakFinder(peakHold)
                 // value: 0
             });
         }
     }
 
-    function calcRatio(freq):Array<Float>
+    function calcRatio(freq):BinRatio
     {
         var bin = freqToBin(freq, Floor); // find closest FFT bin
         var lower = binToFreq(bin);
         var upper = binToFreq(bin + 1);
         var ratio = LogHelper.log2(freq / lower) / LogHelper.log2(upper / lower);
-        return [bin, ratio];
+        return {bin: bin, ratio: ratio};
     }
 
     function freqToBin(freq, mathType:MathType = Round):Int
@@ -196,44 +211,29 @@ class SpectralAnalyzer
     function binToFreq(bin)
 		return bin * audioClip.audioBuffer.sampleRate / fftN;
 
-    var amplitudes(get, default):Array<Float> = [];
-	var ampIndex:Int = 0;
+	// function getAmplitudes(ampIndex:Int):Array<Float>
+	// {
+	// 	// var index:Int = audioClip.currentFrame;
+	// 	return [s for (k => s in stft(ampIndex, fftN))];
+	// }
 
-	function get_amplitudes():Array<Float>
-	{
-		var index:Int = audioClip.currentFrame;
-		if (ampIndex == index)
-			return amplitudes;
-		else
-			ampIndex = index;
-
-		var lilamp = [];
-		final freqs = stft(index, fftN, audioClip.audioBuffer.sampleRate);
-
-		for (k => s in freqs)
-			lilamp.push(s);
-
-		amplitudes = lilamp;
-
-		return lilamp;
-	}
-
+    // TODO pre-calculate this as an array and do simd array multiplication
     function blackmanWindow(n:Int)
-		return 0.42 - a0 * Math.cos(2 * Math.PI * n / (fftN - 1)) + 0.08 * Math.cos(4 * Math.PI * n / (fftN - 1));
+		return 0.42 - 0.50 * Math.cos(2 * Math.PI * n / (fftN - 1)) + 0.08 * Math.cos(4 * Math.PI * n / (fftN - 1));
 
     // computes an STFT frame, starting at the given index within input samples
-	function stft(c:Int, fftN:Int = 4096, fs:Float)
+	function stft(c:Int):Array<Float>
     {
         return [
             for (n in 0...fftN)
-                c + n < Std.int(audioClip.audioBuffer.data.length) ? audioClip.audioBuffer.data[Std.int((c + n))] : 0.0
-        ].mapi((n, x) -> x * blackmanWindow(n)).rfft().map(z -> z.scale(1 / audioClip.audioBuffer.sampleRate).magnitude);
+                c + n < Std.int(audioClip.audioBuffer.data.length) ? audioClip.audioBuffer.data[Std.int(c + n)] : 0.0
+        ].mapi((n, x) -> x * blackmanWindow(n)).rfft().map(z -> z.scale(2.0 / fftN).real);
     }
 
-    function interpolate(bin, ratio:Float)
+    function interpolate(amplitudes:Array<Float>, bin:Int, ratio:Float)
     {
         var value = amplitudes[bin] + (bin < amplitudes.length - 1 ? (amplitudes[bin + 1] - amplitudes[bin]) * ratio : 0);
-        return Math.isNaN(value) ? -Math.NEGATIVE_INFINITY : value;
+        return Math.isNaN(value) ? 0 : value;
     }
 
     function normalizedB(value:Float)
