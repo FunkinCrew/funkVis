@@ -9,7 +9,6 @@ class AudioBuffer
 
     public function new(data:UInt16Array, sampleRate:Float)
     {
-        trace(sampleRate);
         this.data = data;
         this.sampleRate = sampleRate;
     }
