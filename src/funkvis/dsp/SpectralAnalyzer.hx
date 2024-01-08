@@ -11,7 +11,7 @@ typedef BarObject =
 {
 	var binLo:Int;
 	var binHi:Int;
-	var ratios:Array<Float>;
+	var ratio:Float;
     var recentValues:RecentPeakFinder;
 }
 
@@ -100,15 +100,14 @@ class SpectralAnalyzer
             var bar = bars[i];
             var binLo = bar.binLo;
             var binHi = bar.binHi;
-            var ratios = bar.ratios;
+            var ratio = bar.ratio;
 
             var value:Float = Math.NEGATIVE_INFINITY;
 
             for (amplitudes in amplitudesSet) {
-                // for (j in binLo...(binHi+1)) {
-                for (i in 0...ratios.length) {
-                    value = Math.max(value, amplitudes[binLo+i]);
-                    // value = Math.max(value, interpolate(amplitudes, binLo+i, ratios[i]));
+                for (j in binLo...(binHi+1)) {
+                    // value = Math.max(value, amplitudes[binLo+i]);
+                    value = Math.max(value, interpolate(amplitudes, binLo+i, ratio));
                 }
             }
 
@@ -147,17 +146,12 @@ class SpectralAnalyzer
             var binLo = freqToBin(freqLo, Floor);
             var binHi = freqToBin(freqHi, Floor);
 
-            var ratios = [for (bin in binLo...(binHi+1)) {
-                var lower = binToFreq(bin);
-                var upper = binToFreq(bin + 1);
-                var thisFreq = freqLo + bin / binHi * (freqHi - freqLo);
-                LogHelper.log2(thisFreq / lower) / LogHelper.log2(upper / lower);
-            }];
+            var ratio = LogHelper.log2(freq / freqLo) / LogHelper.log2(freqHi / freqLo);
 
             bars.push({
                 binLo: binLo,
                 binHi: binHi,
-                ratios: ratios,
+                ratio: ratio,
                 recentValues: new RecentPeakFinder(peakHold)
             });
         }
