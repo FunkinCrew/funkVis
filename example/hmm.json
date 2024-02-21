@@ -7,10 +7,8 @@
     },
     {
       "name": "funkVis",
-      "type": "git",
-      "dir": "src",
-      "ref": "8b08fd7",
-      "url": "https://github.com/FunkinCrew/funkVis"
+      "type": "dev",
+      "path": "../"
     },
     {
       "name": "hxcpp",
