@@ -94,7 +94,7 @@ class FFT {
 	/**
 		Finds the power of 2 that is equal to or greater than the given natural.
 	**/
-	static function nextPow2(x:Int) : Int {
+	public static function nextPow2(x:Int) : Int {
 		if (x < 2) return 1;
 		else if ((x & (x-1)) == 0) return x;
 		var pow = 2;

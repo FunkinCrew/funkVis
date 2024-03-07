@@ -3,16 +3,18 @@ package;
 import flixel.FlxG;
 import flixel.FlxState;
 import flixel.text.FlxText;
+import funkVis.AudioBuffer;
+import funkVis.LogHelper;
+import funkVis.Scaling;
 import haxe.io.BytesInput;
 import haxe.io.Input;
 import haxe.io.UInt16Array;
 import lime.media.AudioSource;
 import lime.media.vorbis.VorbisFile;
 import lime.utils.Int16Array;
-import sys.io.File;
-import funkVis.AudioBuffer;
-import funkVis.Scaling;
-import funkVis.LogHelper;
+import openfl.utils.Assets;
+
+using StringTools;
 
 class PlayState extends FlxState
 {
@@ -21,11 +23,14 @@ class PlayState extends FlxState
 
 	var debugText:FlxText;
 
+	var musicList:Array<String> = [];
+
 	override public function create()
 	{
 		super.create();
 
-		FlxG.sound.playMusic("assets/music/shoreline.ogg");
+		musicList = fillMusicList("assets/music/musicList.txt");
+		FlxG.sound.playMusic("assets/music/" + musicList[2] + ".ogg");
 
 		@:privateAccess
 		musicSrc = cast FlxG.sound.music._channel.__source;
@@ -63,5 +68,15 @@ class PlayState extends FlxState
 	{
 		debugText.text += "\n";
 		debugText.text += "" + text;
+	}
+
+	/**
+	 * Returns an array of song names to use for music list
+	 * @param listPath file path to the txt file
+	 * @return An array of song names from the txt file
+	 */
+	function fillMusicList(listPath:String):Array<String>
+	{
+		return Assets.getText(listPath).split("\n").map(str -> str.trim());
 	}
 }

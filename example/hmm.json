@@ -7,8 +7,8 @@
     },
     {
       "name": "funkVis",
-      "type": "dev",
-      "path": "../"
+      "path": "../",
+      "type": "dev"
     },
     {
       "name": "hxcpp",
@@ -19,13 +19,6 @@
       "name": "hxcpp-debug-server",
       "type": "haxelib",
       "version": "1.2.4"
-    },
-    {
-      "name": "hxdsp",
-      "type": "git",
-      "dir": null,
-      "ref": "c4a7001",
-      "url": "https://github.com/baioc/hxdsp"
     },
     {
       "name": "lime",

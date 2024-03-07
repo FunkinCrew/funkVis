@@ -15,4 +15,10 @@ class Scaling
 
 	public static function invFreqScaleBark(x:Float):Float
 		return 1960 / (26.81 / (x + .53) - 1);
+
+	public static function freqScaleLog(freq:Float):Float
+		return LogHelper.log10(1 + freq / 1000);
+
+	public static function invFreqScaleLog(x:Float):Float
+		return 1000 * (Math.pow(10, x - 1));
 }

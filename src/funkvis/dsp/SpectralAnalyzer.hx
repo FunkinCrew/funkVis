@@ -42,12 +42,17 @@ class SpectralAnalyzer
 {
     var bars:Array<BarObject> = [];
     var audioClip:AudioClip;
-	final fftN = 4096;
+	public var fftN(default, set):Int = 2048;
     var maxDelta:Float;
     var peakHold:Int;
     var blackmanWindow = new Array<Float>();
     var minFreq:Float = 30;
     var maxFreq:Float = 14000;
+
+    function set_fftN(value:Int):Int
+    {
+        return FFT.nextPow2(value);
+    }
     
     public function new(barCount:Int, audioClip:AudioClip, maxDelta:Float = 0.01, peakHold:Int = 30)
     {
@@ -134,13 +139,13 @@ class SpectralAnalyzer
 
     function calcBars(barCount:Int, peakHold:Int)
     {
-        var scaleMin:Float = Scaling.freqScaleBark(minFreq);
-        var stride = Scaling.freqScaleBark(maxFreq) - scaleMin;
+        var scaleMin:Float = Scaling.freqScaleLog(minFreq);
+        var stride = Scaling.freqScaleLog(maxFreq) - scaleMin;
 
         for (i in 0...barCount)
         {
-            var freqLo:Float = Scaling.invFreqScaleBark(scaleMin + (i * stride) / barCount);
-            var freqHi:Float = Scaling.invFreqScaleBark(scaleMin + ((i+1) * stride) / barCount);
+            var freqLo:Float = Scaling.invFreqScaleLog(scaleMin + (i * stride) / barCount);
+            var freqHi:Float = Scaling.invFreqScaleLog(scaleMin + ((i+1) * stride) / barCount);
             var freq:Float = (freqHi + freqLo) / 2.0;
 
             var binLo = freqToBin(freqLo, Floor);
