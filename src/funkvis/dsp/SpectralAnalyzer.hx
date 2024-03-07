@@ -46,8 +46,10 @@ class SpectralAnalyzer
     var maxDelta:Float;
     var peakHold:Int;
     var blackmanWindow = new Array<Float>();
-    var minFreq:Float = 30;
-    var maxFreq:Float = 14000;
+    public var minFreq:Float = 30;
+    public var maxFreq:Float = 14000;
+    public var minDb:Float = -40;
+    public var maxDb:Float = -20;
 
     function set_fftN(value:Int):Int
     {
@@ -206,8 +208,8 @@ class SpectralAnalyzer
 
     function normalizedB(value:Float)
     {
-        var maxValue = -20;
-        var minValue = -40;
+        var maxValue = maxDb;
+        var minValue = minDb;
 
         // return FlxMath.remapToRange(value, minValue, maxValue, 0, 1);
         return clamp((value - minValue) / (maxValue - minValue), 0, 1);
