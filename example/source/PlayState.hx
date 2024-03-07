@@ -30,7 +30,7 @@ class PlayState extends FlxState
 		super.create();
 
 		musicList = fillMusicList("assets/music/musicList.txt");
-		FlxG.sound.playMusic("assets/music/" + musicList[2] + ".ogg");
+		FlxG.sound.playMusic("assets/music/" + musicList[0] + ".ogg");
 
 		@:privateAccess
 		musicSrc = cast FlxG.sound.music._channel.__source;
