@@ -13,7 +13,6 @@ class Visualizer extends FlxGroup
     var grpBars:FlxTypedGroup<FlxSprite>;
     var peakLines:FlxTypedGroup<FlxSprite>;
     var analyzer:SpectralAnalyzer;
-    var debugMode:Bool = false;
 
     public function new(audioClip:AudioClip, barCount:Int = 8)
     {
@@ -42,28 +41,12 @@ class Visualizer extends FlxGroup
 
     override function draw()
     {
-        var levels = analyzer.getLevels(debugMode);
+        var levels = analyzer.getLevels();
 
         for (i in 0...min(grpBars.members.length, levels.length)) {
             grpBars.members[i].scale.y = levels[i].value;
             peakLines.members[i].y = FlxG.height - (levels[i].peak * FlxG.height);
         }
-
-        if (debugMode) {
-            lime.system.System.exit(0);
-        }
         super.draw();
-    }
-
-    override public function update(elapsed:Float):Void
-    {
-        if (FlxG.keys.justReleased.ENTER)
-        {
-            debugMode = true;
-            // The up arrow key is currently pressed
-            // This code is executed every frame, while the key is pressed
-        }
-
-        super.update(elapsed);
     }
 }

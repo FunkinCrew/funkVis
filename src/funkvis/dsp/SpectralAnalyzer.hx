@@ -69,15 +69,8 @@ class SpectralAnalyzer
         return val <= min ? min : val >= max ? max : val;
     }
 
-    private static function writeCSV(name:String, data:Array<Float>)
-    {
-        var output = sys.io.File.write(name, false);
-        output.writeString(data.join("\n"));
-        output.close();
-    }
-
     // For second stage, make this return a second set of recent peaks
-    public function getLevels(debugMode:Bool):Array<Bar>
+    public function getLevels():Array<Bar>
     {
         var levels = new Array<Bar>();
 
@@ -90,9 +83,6 @@ class SpectralAnalyzer
 
         for (index in indices) {
             var amplitudes = stft(index);
-            if (debugMode) {
-                writeCSV('amplitudes$index.csv', amplitudes);
-            }
             amplitudesSet.push(amplitudes);
         }
 
@@ -123,10 +113,6 @@ class SpectralAnalyzer
             var recentPeak = bar.recentValues.peak;
 
             levels.push({value: value, peak: recentPeak});
-        }
-
-        if (debugMode) {
-            writeCSV('levels.csv', [for (level in levels) level.value]);
         }
 
         return levels;
