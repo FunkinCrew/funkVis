@@ -19,7 +19,7 @@ class Visualizer extends FlxGroup
     {
         super();
 
-        analyzer = new SpectralAnalyzer(barCount, audioClip, 0.005, 30);
+        analyzer = new SpectralAnalyzer(barCount, audioClip, 0.01, 30);
         grpBars = new FlxTypedGroup<FlxSprite>();
 		add(grpBars);
         peakLines = new FlxTypedGroup<FlxSprite>();
@@ -42,7 +42,7 @@ class Visualizer extends FlxGroup
 
     override function draw()
     {
-        var levels = analyzer.getLevels(debugMode);
+        var levels = analyzer.getLevels(debugMode, FlxG.elapsed);
 
         for (i in 0...min(grpBars.members.length, levels.length)) {
             grpBars.members[i].scale.y = levels[i].value;
