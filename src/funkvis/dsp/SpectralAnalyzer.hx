@@ -46,8 +46,8 @@ class SpectralAnalyzer
     var maxDelta:Float;
     var peakHold:Int;
     var blackmanWindow = new Array<Float>();
-    var smoothing:Float = 0;
-    var overlap:Float = 0.5;
+    // public var overlap:Float = 0.1;
+    public var smoothing:Float = 0.5;
     public var minFreq:Float = 30;
     public var maxFreq:Float = 20000;
     public var minDb:Float = -90;
@@ -106,20 +106,21 @@ class SpectralAnalyzer
 
         var prevLevels:Array<Float> = previousSTFT;
         var sameAsPrev:Bool = false;
+
         for (index in indices) {
             var amplitudes = stft(index, elapsed);
-            sameAsPrev = amplitudes == prevLevels;
+            // sameAsPrev = amplitudes == prevLevels;
             if (debugMode) {
                 writeCSV('amplitudes$index.csv', amplitudes);
             }
             amplitudesSet.push(amplitudes);
         }
 
-        if (sameAsPrev) {
-            var smoothedAmplitudes = applyEMASmoothing(prevSmoothedSTFT, previousSTFT, smoothing);
-            amplitudesSet = [smoothedAmplitudes];
-            prevSmoothedSTFT = smoothedAmplitudes;
-        }
+        // if (sameAsPrev) {
+        //     var smoothedAmplitudes = applyEMASmoothing(prevSmoothedSTFT, previousSTFT, smoothing);
+        //     amplitudesSet = [smoothedAmplitudes];
+        //     prevSmoothedSTFT = smoothedAmplitudes;
+        // }
 
         for (i in 0...bars.length) {
             var bar = bars[i];
@@ -236,7 +237,7 @@ class SpectralAnalyzer
 	function stft(c:Int, elapsed:Float):Array<Float>
     {   
         var windowSize:Int = Std.int(audioClip.audioBuffer.sampleRate * elapsed);
-        if (c > currentAudioBlock * (fftN * ((overlap * -1) + 1)))
+        if (c > currentAudioBlock * fftN)
             currentAudioBlock++;
         else
             return previousSTFT;
