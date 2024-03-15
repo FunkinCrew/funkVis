@@ -50,8 +50,8 @@ class SpectralAnalyzer
     public var smoothing:Float = 0.5;
     public var minFreq:Float = 30;
     public var maxFreq:Float = 20000;
-    public var minDb:Float = -90;
-    public var maxDb:Float = -10;
+    public var minDb:Float = -80;
+    public var maxDb:Float = -20;
 
     function set_fftN(value:Int):Int
     {
@@ -75,7 +75,7 @@ class SpectralAnalyzer
     {
         blackmanWindow.resize(size);
         for (i in 0...size) {
-            blackmanWindow[i] = calculateBlackmanWindow(i, size);
+            blackmanWindow[i] = calculateFlatTopWindow(i, size);
         }
     }
 
@@ -237,20 +237,28 @@ class SpectralAnalyzer
 	function stft(c:Int, elapsed:Float):Array<Float>
     {   
         var windowSize:Int = Std.int(audioClip.audioBuffer.sampleRate * elapsed);
-        if (c > currentAudioBlock * fftN)
+        if (c > currentAudioBlock * windowSize)
             currentAudioBlock++;
         else
             return previousSTFT;
         
-        resizeBlackmanWindow(fftN);
+        resizeBlackmanWindow(windowSize);
         var updatedSTFT = [
-            for (n in 0...fftN)
-                c + (n * 2) < Std.int(audioClip.audioBuffer.data.length) ? audioClip.audioBuffer.data[Std.int(c + (n * 2))] / 65536.0 : 0
-        ].mapi((n, x) -> x * blackmanWindow[n]).rfft().map(z -> z.scale(1 / audioClip.audioBuffer.sampleRate).magnitude).mapi(freqRangeFilter);
-        var smoothedSTFT:Array<Float> = applyEMASmoothing(previousSTFT, updatedSTFT, smoothing);
+            for (n in 0...windowSize)
+                c + (n * 2) < Std.int(audioClip.audioBuffer.data.length) ? audioClip.audioBuffer.data[Std.int(c + (n * 2))] / 65536.0 : 0 ]
+                .mapi((n, x) -> x * blackmanWindow[n])
+                .rfft()
+                .mapi((ind, z) -> {
+                    // do this in one loop/map, instead of two
+                    var smoothingInput = freqRangeFilter(ind, z.scale(1 / audioClip.audioBuffer.sampleRate).magnitude);
+                    var previousValue = (ind < previousSTFT.length) ? previousSTFT[ind] : 0.0;
 
-        previousSTFT = smoothedSTFT;
-        return smoothedSTFT;
+                    return doEMASmooth(smoothingInput, previousValue, smoothing);
+                });
+            // var smoothedSTFT:Array<Float> = applyEMASmoothing(previousSTFT, updatedSTFT, smoothing);
+            
+        previousSTFT = updatedSTFT;
+        return updatedSTFT;
     }
 
     function interpolate(amplitudes:Array<Float>, bin:Int, ratio:Float)
@@ -262,19 +270,24 @@ class SpectralAnalyzer
     public static function applyEMASmoothing(previousSTFT:Array<Float>, updatedSTFT:Array<Float>, smoothingFactor:Float):Array<Float> {
         var smoothedSTFT = new Array<Float>();
     
-        if (smoothingFactor < 0 || smoothingFactor > 1) {
-            clamp(smoothingFactor, 0, 1);
-        }
-    
         for (i in 0...updatedSTFT.length) {
             var previousValue = (i < previousSTFT.length) ? previousSTFT[i] : 0.0;
             var currentValue = updatedSTFT[i];
     
-            var smoothedValue = smoothingFactor * previousValue + (1 - smoothingFactor) * Math.abs(currentValue);
+            var smoothedValue = doEMASmooth(currentValue, previousValue, smoothingFactor);
             smoothedSTFT.push(Math.isNaN(smoothedValue) ? 0.0 : smoothedValue);
         }
     
         return smoothedSTFT;
+    }
+
+    // Runs an EMA smooth on a single input value, using a single previous input
+    public static function doEMASmooth(input:Float, previousInput:Float, smoothingFactor:Float):Float
+    {
+        if (smoothingFactor < 0 || smoothingFactor > 1) {
+            clamp(smoothingFactor, 0, 1);
+        }
+        return smoothingFactor * previousInput + (1 - smoothingFactor) * Math.abs(input);
     }
     
 
