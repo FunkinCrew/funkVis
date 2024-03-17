@@ -21,6 +21,13 @@
       "version": "1.2.4"
     },
     {
+      "name": "instrument",
+      "type": "git",
+      "dir": null,
+      "ref": "master",
+      "url": "https://github.com/AlexHaxe/haxe-instrument"
+    },
+    {
       "name": "lime",
       "type": "haxelib",
       "version": "8.0.2"

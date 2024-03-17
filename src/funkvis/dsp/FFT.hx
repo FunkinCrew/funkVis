@@ -1,6 +1,7 @@
 package funkVis.dsp;
 
 import funkVis.dsp.Complex;
+import haxe.ds.Vector;
 
 // these are only used for testing, down in FFT.main()
 using funkVis.dsp.OffsetArray;
@@ -29,6 +30,7 @@ class FFT {
 		Hermitian-symmetric so we only return the positive frequencies.
 	**/
 	public static function rfft(input:Array<Float>) : Array<Complex> {
+		checkAndComputeTwiddles(input.length);
 		final s = fft(input.map(Complex.fromReal));
 		return s.slice(0, Std.int(s.length / 2) + 1);
 	}
@@ -50,8 +52,9 @@ class FFT {
 		var fs = [for (_ in 0...n) Complex.zero];
 		ditfft2(ts, 0, fs, 0, n, 1, inverse);
 		return inverse ? fs.map(z -> z.scale(1 / n)) : fs;
-		return fs;
 	}
+
+
 
 	// Radix-2 Decimation-In-Time variant of Cooley–Tukey's FFT, recursive.
 	private static function ditfft2(
@@ -66,11 +69,49 @@ class FFT {
 			ditfft2(time, t,        freq, f,           halfLen, step * 2, inverse);
 			ditfft2(time, t + step, freq, f + halfLen, halfLen, step * 2, inverse);
 			for (k in 0...halfLen) {
-				final twiddle = Complex.exp((inverse ? 1 : -1) * 2 * Math.PI * k / n);
+				final twiddle = Complex.exp((inverse ? 1 : -1) * 2 * Math.PI * k / n); 
 				final even = freq[f + k].copy();
 				final odd = freq[f + k + halfLen].copy();
 				freq[f + k]           = even + twiddle * odd;
 				freq[f + k + halfLen] = even - twiddle * odd;
+			}
+		}
+	}
+
+	private static function ditfft4(time:Array<Complex>, t:Int, freq:Array<Complex>, f:Int, n:Int, step:Int, inverse:Bool):Void {
+		
+		if (n == 4) {
+			// Base case: Compute the 4-point DFT directly
+			for (k in 0...n) {
+				var sum = Complex.zero;
+				for (j in 0...4) {
+					var twiddle = Complex.exp((inverse ? 1 : -1) * 2 * Math.PI * k / n); 
+					sum += time[t + j * step] * twiddle;
+				}
+				freq[f + k] = sum;
+			}
+		} else {
+			final quarterLen = Std.int(n / 4);
+			ditfft4(time, t, freq, f, quarterLen, step * 4, inverse);
+			ditfft4(time, t + step, freq, f + quarterLen, quarterLen, step * 4, inverse);
+			ditfft4(time, t + 2 * step, freq, f + 2 * quarterLen, quarterLen, step * 4, inverse);
+			ditfft4(time, t + 3 * step, freq, f + 3 * quarterLen, quarterLen, step * 4, inverse);
+	
+			for (k in 0...quarterLen) {
+				final twiddle0 = Complex.exp((inverse ? 1 : -1) * 2 * Math.PI * k / n); 
+				final twiddle1 = Complex.exp((inverse ? 1 : -1) * 2 * Math.PI * k / n); 
+				final twiddle2 = Complex.exp((inverse ? 1 : -1) * 2 * Math.PI * k * 2 / n); 
+				final twiddle3 = Complex.exp((inverse ? 1 : -1) * 2 * Math.PI * k * 3 / n); 
+	
+				final f0 = freq[f + k].copy();
+				final f1 = freq[f + k + quarterLen].copy() * twiddle1;
+				final f2 = freq[f + k + 2 * quarterLen].copy() * twiddle2;
+				final f3 = freq[f + k + 3 * quarterLen].copy() * twiddle3;
+	
+				freq[f + k] = f0 + f1 +  f2 + f3;
+				freq[f + k + quarterLen] = f0 + f1 - f2 - f3;
+				freq[f + k + 2 * quarterLen] = f0 -  f1 - f2 + f3;
+				freq[f + k + 3 * quarterLen] = f0 -  f1 + f2 - f3;
 			}
 		}
 	}
@@ -89,6 +130,50 @@ class FFT {
 			fs[f] = inverse ? sum.scale(1 / n) : sum;
 		}
 		return fs;
+	}
+
+	private static function checkAndComputeTwiddles(n:Int, inverse:Bool = false) : Void {
+		
+		var twiddleLength:Int = inverse ? twiddleFactorsInversed?.length ?? 0 : twiddleFactors?.length ?? 0;
+
+		if (twiddleLength * 4 != n)
+			precomputeTwiddleFactors(n, inverse);
+		
+		
+	}
+
+	private static var twiddleFactorsInversed:Array<Complex>;
+
+	private static var twiddleFactors:Array<Complex>;
+
+	private static function precomputeTwiddleFactors(maxN:Int, inverse:Bool):Void
+	{
+		trace("COMPUTING TWIDDLES FOR: " + maxN + " INVERSE: " + inverse);
+		var n:Int = maxN;
+
+		var twiddles:Array<Complex> = [];
+		// for (k in 0...Std.int(n / 2)) { // n/2 because of symmetry
+		// 	var twiddle:Complex = Complex.exp((inverse ? 1 : -1) * 2 * Math.PI * k / n);
+		// 	twiddles.push(twiddle);
+		// }
+
+		// radix4 twiddles
+		for (k in 0...Std.int(n / 4)) { // n/4 because of symmetry in Radix-4
+			var twiddle:Complex = Complex.exp((inverse ? 1 : -1) * 2 * Math.PI * k / n);
+			twiddles.push(twiddle);
+		}
+
+		if (inverse)		
+			twiddleFactorsInversed = twiddles;
+		else		
+			twiddleFactors = twiddles;
+	}
+
+	private static function useTwiddleFactor(n:Int, k:Int, inverse:Bool = false):Complex {
+		// Compute the index adjustment based on the FFT size n
+		// var indexAdjustment:Int = Std.int(twiddleFactors.length / (n / 4));
+		var twiddlesToUse = inverse ? twiddleFactorsInversed : twiddleFactors;
+		return twiddlesToUse[k];
 	}
 
 	/**
