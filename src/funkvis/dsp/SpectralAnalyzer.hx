@@ -49,6 +49,7 @@ class SpectralAnalyzer
 	public var fftN(default, set):Int = 4096;
     var maxDelta:Float;
     var peakHold:Int;
+    var barCount:Int;
     var blackmanWindow = new Array<Float>();
     // public var overlap:Float = 0.1;
     public var smoothing:Float = 0.5;
@@ -59,14 +60,19 @@ class SpectralAnalyzer
 
     function set_fftN(value:Int):Int
     {
-        return FFT.nextPow2(value);
+        var pow2 = FFT.nextPow2(value);
+
+        calcBars(barCount, peakHold);
+        resizeBlackmanWindow(pow2);
+        return pow2;
     }
-    
+
     public function new(barCount:Int, audioClip:AudioClip, maxDelta:Float = 0.01, peakHold:Int = 30)
     {
         this.audioClip = audioClip;
         this.maxDelta = maxDelta;
         this.peakHold = peakHold;
+        this.barCount = barCount;
         maxFreq = Math.min(maxFreq, audioClip.audioBuffer.sampleRate / 2);
 
         calcBars(barCount, peakHold);
@@ -105,8 +111,8 @@ class SpectralAnalyzer
         var indices:Array<Int> = [index];
         var halfStride:Int = Std.int(fftN / 2);
         var stride:Int = Std.int(fftN * smoothing);
-        // if (index - halfStride > 0) indices = [index - halfStride];
-        if (audioClip.audioBuffer.data.length > index + halfStride) indices = [index + stride];
+        if (index - halfStride > 0) indices = [index - halfStride];
+        // if (audioClip.audioBuffer.data.length > index + halfStride) indices = [index + stride];
         var amplitudesSet = new Array<Array<Float>>();
 
         var prevLevels:Array<Float> = previousSTFT;
@@ -185,6 +191,7 @@ class SpectralAnalyzer
 
     function calcBars(barCount:Int, peakHold:Int)
     {
+        bars = [];
         // var bandWidth = Math.pow(2, 1 / bands);
         // var halfBand = Math.pow(bandWidth, 0.5);
 
@@ -201,7 +208,7 @@ class SpectralAnalyzer
 
         for (i in 0...barCount)
         {
-            var curFreq:Float = Math.pow(10, LogHelper.log10(minFreq) + (logStep * i)); 
+            var curFreq:Float = Math.pow(10, LogHelper.log10(minFreq) + (logStep * i));
 
             var freqLo:Float = curFreq;
             var freqHi:Float = Math.pow(10, LogHelper.log10(minFreq) + (logStep * (i + 1)));
@@ -211,7 +218,7 @@ class SpectralAnalyzer
 
             var ratioLo = calcRatio(freqLo);
             var ratioHi = calcRatio(freqHi);
-            
+
             bars.push(
                 {
                     binLo: binLo,
@@ -223,7 +230,7 @@ class SpectralAnalyzer
                     ratioHi: ratioHi,
                     recentValues: new RecentPeakFinder(peakHold)
                 });
-            
+
             // curScale += stride;
         }
 
@@ -260,8 +267,8 @@ class SpectralAnalyzer
         //         recentValues: new RecentPeakFinder(peakHold)
         //     });
         // }
-        for (bar in bars)
-            trace(bar);
+        // for (bar in bars)
+        //     trace(bar);
         // trace([for (bar in bars) {binHi: bar.binHi, binLo: bar.binLo}]);
     }
 
@@ -304,7 +311,7 @@ class SpectralAnalyzer
         var A3:Float = 0.388;
         var A4:Float = 0.032;
         var factor:Float = Math.PI * n / (fftN - 1);
-    
+
         return A0
                - A1 * Math.cos(2 * factor)
                + A2 * Math.cos(4 * factor)
@@ -330,18 +337,18 @@ class SpectralAnalyzer
     var currentSmoothedSTFT:Array<Float> = [0.0];
     // computes an STFT frame, starting at the given index within input samples
 	function stft(c:Int, elapsed:Float):Array<Float>
-    {   
+    {
         var windowSize:Int = Std.int(audioClip.audioBuffer.sampleRate * elapsed);
         var lengthOfFrameInSamples:Float = 44100 * elapsed;
         if (c > currentAudioBlock * fftN)
             currentAudioBlock++;
         else
-        {   
+        {
             var smooth = applyEMASmoothing(previousSTFT, currentSmoothedSTFT, smoothing);
             previousSTFT = smooth;
             return smooth;
         }
-            
+
         currentSmoothedSTFT = [];
         // resizeBlackmanWindow(fftN);
         var updatedSTFT = [
@@ -357,7 +364,7 @@ class SpectralAnalyzer
                     return doEMASmooth(smoothingInput, previousValue, smoothing);
                 });
             // var smoothedSTFT:Array<Float> = applyEMASmoothing(previousSTFT, updatedSTFT, smoothing);
-            
+
         previousSTFT = updatedSTFT;
         return updatedSTFT;
     }
@@ -376,15 +383,15 @@ class SpectralAnalyzer
 
     public static function applyEMASmoothing(previousSTFT:Array<Float>, updatedSTFT:Array<Float>, smoothingFactor:Float):Array<Float> {
         var smoothedSTFT = new Array<Float>();
-    
+
         for (i in 0...updatedSTFT.length) {
             var previousValue = (i < previousSTFT.length) ? previousSTFT[i] : 0.0;
             var currentValue = updatedSTFT[i];
-    
+
             var smoothedValue = doEMASmooth(currentValue, previousValue, smoothingFactor);
             smoothedSTFT.push(Math.isNaN(smoothedValue) ? 0.0 : smoothedValue);
         }
-    
+
         return smoothedSTFT;
     }
 
@@ -396,7 +403,7 @@ class SpectralAnalyzer
         }
         return smoothingFactor * previousInput + (1 - smoothingFactor) * Math.abs(input);
     }
-    
+
 
     function normalizedB(value:Float)
     {
