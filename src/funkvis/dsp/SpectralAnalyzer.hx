@@ -11,7 +11,11 @@ typedef BarObject =
 {
 	var binLo:Int;
 	var binHi:Int;
+    var freqLo:Float;
+    var freqHi:Float;
 	var ratio:Float;
+    var ratioLo:Float;
+    var ratioHi:Float;
     var recentValues:RecentPeakFinder;
 }
 
@@ -51,7 +55,7 @@ class SpectralAnalyzer
     public var minFreq:Float = 30;
     public var maxFreq:Float = 20000;
     public var minDb:Float = -80;
-    public var maxDb:Float = -20;
+    public var maxDb:Float = -25;
 
     function set_fftN(value:Int):Int
     {
@@ -73,9 +77,10 @@ class SpectralAnalyzer
 
     function resizeBlackmanWindow(size:Int)
     {
+        if (blackmanWindow.length == size) return;
         blackmanWindow.resize(size);
         for (i in 0...size) {
-            blackmanWindow[i] = calculateFlatTopWindow(i, size);
+            blackmanWindow[i] = calculateBlackmanWindow(i, size);
         }
     }
 
@@ -126,23 +131,41 @@ class SpectralAnalyzer
             var bar = bars[i];
             var binLo = bar.binLo;
             var binHi = bar.binHi;
+            var freqLo = bar.freqLo;
+            var freqHi = bar.freqHi;
             var ratio = bar.ratio;
+            var ratioLo = bar.ratioLo;
+            var ratioHi = bar.ratioHi;
 
-            var value:Float = Math.NEGATIVE_INFINITY;
-            for (amplitudes in amplitudesSet) {
-                for (j in binLo...(binHi+1)) {
-                    // value = Math.max(value, amplitudes[binLo+i]);
-                    value = Math.max(value, interpolate(amplitudes, binLo+i, ratio));
-                }
+            var value:Float = Math.max(interpolateDbValues(amplitudesSet[0], binLo, ratioLo), interpolateDbValues(amplitudesSet[0], binHi, ratioHi));
+
+            for (j in (binLo + 1)...(binHi)) {
+                if (toDb(amplitudesSet[0][j]) > value)
+                    value = toDb(amplitudesSet[0][j]);
             }
 
-
-            value = 20 * LogHelper.log10(value); // gets converted to decibels
             value = normalizedB(value);
+
+            // for (amplitudes in amplitudesSet) {
+            //     for (j in (binLo + 1)...(binHi)) {
+            //         // value = Math.max(value, amplitudes[binLo+i]);
+            //         var db = 20 * LogHelper.log10(amplitudes[j]);
+            //         value += normalizedB(db);
+            //         // value = Math.max(value, interpolate(amplitudes, binLo+i, ratio));
+            //     }
+            // }
+
+            // value /= binHi - binLo + 1;
+            // value = 20 * LogHelper.log10(value); // gets converted to decibels
+            // value = normalizedB(value);
 
             // slew limiting
             var lastValue = bar.recentValues.lastValue;
             var delta = clamp(value - lastValue, -1 * maxDelta, maxDelta);
+            // if (delta < 0)
+            // {
+                // value = lastValue + delta;
+            // }
             // value = lastValue + delta;
             bar.recentValues.push(value);
 
@@ -158,32 +181,98 @@ class SpectralAnalyzer
         return levels;
     }
 
+
+
     function calcBars(barCount:Int, peakHold:Int)
     {
+        // var bandWidth = Math.pow(2, 1 / bands);
+        // var halfBand = Math.pow(bandWidth, 0.5);
+
+        var logStep = (LogHelper.log10(maxFreq) - LogHelper.log10(minFreq)) / (barCount);
+
         var scaleMin:Float = Scaling.freqScaleLog(minFreq);
-        var stride = Scaling.freqScaleLog(maxFreq) - scaleMin;
+        var scaleMax:Float = Scaling.freqScaleLog(maxFreq);
+
+        trace(scaleMin);
+        trace(scaleMax);
+        var curScale:Float = scaleMin;
+
+        // var stride = (scaleMax - scaleMin) / bands;
 
         for (i in 0...barCount)
         {
-            var freqLo:Float = Scaling.invFreqScaleLog(scaleMin + (i * stride) / barCount);
-            var freqHi:Float = Scaling.invFreqScaleLog(scaleMin + ((i+1) * stride) / barCount);
-            var freq:Float = (freqHi + freqLo) / 2.0;
+            var curFreq:Float = Math.pow(10, LogHelper.log10(minFreq) + (logStep * i)); 
+
+            var freqLo:Float = curFreq;
+            var freqHi:Float = Math.pow(10, LogHelper.log10(minFreq) + (logStep * (i + 1)));
 
             var binLo = freqToBin(freqLo, Floor);
-            var binHi = freqToBin(freqHi, Floor);
+            var binHi = freqToBin(freqHi);
 
-            var ratio = LogHelper.log2(freq / freqLo) / LogHelper.log2(freqHi / freqLo);
-
-            bars.push({
-                binLo: binLo,
-                binHi: binHi,
-                ratio: ratio,
-                recentValues: new RecentPeakFinder(peakHold)
-            });
+            var ratioLo = calcRatio(freqLo);
+            var ratioHi = calcRatio(freqHi);
+            
+            bars.push(
+                {
+                    binLo: binLo,
+                    binHi: binHi,
+                    freqLo: freqLo,
+                    freqHi: freqHi,
+                    ratio: (ratioLo + ratioHi) / 2.0,
+                    ratioLo: ratioLo,
+                    ratioHi: ratioHi,
+                    recentValues: new RecentPeakFinder(peakHold)
+                });
+            
+            // curScale += stride;
         }
 
-        trace(bars);
+        if (bars[0].freqLo < minFreq)
+        {
+            bars[0].freqLo = minFreq;
+            bars[0].binLo = freqToBin(minFreq, Floor);
+            bars[0].ratio = calcRatio(minFreq);
+            bars[0].ratioLo = calcRatio(minFreq);
+        }
+
+        if (bars[bars.length - 1].freqHi > maxFreq)
+        {
+            bars[bars.length - 1].freqHi = maxFreq;
+            bars[bars.length - 1].binHi = freqToBin(maxFreq, Floor);
+            bars[bars.length - 1].ratio = calcRatio(maxFreq);
+        }
+
+        // for (i in 0...barCount)
+        // {
+        //     var freqLo:Float = Scaling.invFreqScaleLog(scaleMin + (i * stride) / barCount);
+        //     var freqHi:Float = Scaling.invFreqScaleLog(scaleMin + ((i+1) * stride) / barCount);
+        //     var freq:Float = (freqHi + freqLo) / 2.0;
+
+        //     var binLo = freqToBin(freqLo, Floor);
+        //     var binHi = freqToBin(freqHi, Floor);
+
+        //     var ratio = LogHelper.log2(freq / freqLo) / LogHelper.log2(freqHi / freqLo);
+
+        //     bars.push({
+        //         binLo: binLo,
+        //         binHi: binHi,
+        //         ratio: ratio,
+        //         recentValues: new RecentPeakFinder(peakHold)
+        //     });
+        // }
+        for (bar in bars)
+            trace(bar);
         // trace([for (bar in bars) {binHi: bar.binHi, binLo: bar.binLo}]);
+    }
+
+    function calcRatio(freq:Float)
+    {
+        var bin = freqToBin(freq, Floor);
+        var lower = binToFreq(bin);
+        var upper = binToFreq(bin + 1);
+
+        return LogHelper.log2(freq / lower) / LogHelper.log2(upper / lower);
+
     }
 
     function freqToBin(freq:Float, mathType:MathType = Round):Int
@@ -195,6 +284,11 @@ class SpectralAnalyzer
             case Ceil: Math.ceil(bin);
             case Cast: Std.int(bin);
         }
+    }
+
+    function toDb(value:Float):Float
+    {
+        return 20 * LogHelper.log10(value);
     }
 
     function binToFreq(bin)
@@ -233,26 +327,33 @@ class SpectralAnalyzer
     var currentAudioBlock:Int = 0;
     var previousSTFT:Array<Float> = [0.0];
     var prevSmoothedSTFT:Array<Float> = [0.0];
+    var currentSmoothedSTFT:Array<Float> = [0.0];
     // computes an STFT frame, starting at the given index within input samples
 	function stft(c:Int, elapsed:Float):Array<Float>
     {   
         var windowSize:Int = Std.int(audioClip.audioBuffer.sampleRate * elapsed);
-        if (c > currentAudioBlock * windowSize)
+        var lengthOfFrameInSamples:Float = 44100 * elapsed;
+        if (c > currentAudioBlock * fftN)
             currentAudioBlock++;
         else
-            return previousSTFT;
-        
-        resizeBlackmanWindow(windowSize);
+        {   
+            var smooth = applyEMASmoothing(previousSTFT, currentSmoothedSTFT, smoothing);
+            previousSTFT = smooth;
+            return smooth;
+        }
+            
+        currentSmoothedSTFT = [];
+        // resizeBlackmanWindow(fftN);
         var updatedSTFT = [
-            for (n in 0...windowSize)
+            for (n in 0...fftN)
                 c + (n * 2) < Std.int(audioClip.audioBuffer.data.length) ? audioClip.audioBuffer.data[Std.int(c + (n * 2))] / 65536.0 : 0 ]
                 .mapi((n, x) -> x * blackmanWindow[n])
                 .rfft()
                 .mapi((ind, z) -> {
                     // do this in one loop/map, instead of two
-                    var smoothingInput = freqRangeFilter(ind, z.scale(1 / audioClip.audioBuffer.sampleRate).magnitude);
+                    var smoothingInput = z.scale(1 / audioClip.audioBuffer.sampleRate).magnitude;
                     var previousValue = (ind < previousSTFT.length) ? previousSTFT[ind] : 0.0;
-
+                    currentSmoothedSTFT.push(smoothingInput);
                     return doEMASmooth(smoothingInput, previousValue, smoothing);
                 });
             // var smoothedSTFT:Array<Float> = applyEMASmoothing(previousSTFT, updatedSTFT, smoothing);
@@ -264,6 +365,12 @@ class SpectralAnalyzer
     function interpolate(amplitudes:Array<Float>, bin:Int, ratio:Float)
     {
         var value = amplitudes[bin] + (bin < amplitudes.length - 1 ? (amplitudes[bin + 1] - amplitudes[bin]) * ratio : Math.NEGATIVE_INFINITY);
+        return Math.isNaN(value) ? Math.NEGATIVE_INFINITY : value;
+    }
+
+    function interpolateDbValues(amplitudes:Array<Float>, bin:Int, ratio:Float)
+    {
+        var value = toDb(amplitudes[bin]) + (bin < amplitudes.length - 1 ? (toDb(amplitudes[bin + 1]) - toDb(amplitudes[bin])) * ratio : Math.NEGATIVE_INFINITY);
         return Math.isNaN(value) ? Math.NEGATIVE_INFINITY : value;
     }
 

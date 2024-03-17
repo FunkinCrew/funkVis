@@ -37,7 +37,7 @@ class PlayState extends FlxState
 
 		data = cast musicSrc.buffer.data;
 
-		var visualizer = new Visualizer(new AudioClip(musicSrc));
+		var visualizer = new Visualizer(new AudioClip(musicSrc), 32);
 		add(visualizer);
 
 		debugText = new FlxText(0, 0, 0, "test", 24);
@@ -62,6 +62,15 @@ class PlayState extends FlxState
 		addDebugText((data.length / 4) / musicSrc.buffer.sampleRate);
 		addDebugText(FlxG.sound.music.length / 1000);
 		super.update(elapsed);
+
+		if (FlxG.keys.justPressed.SPACE)
+		{
+			#if instrument
+			// instrument.coverage.Coverage.endCoverage(); // when measuring coverage
+			instrument.profiler.Profiler.endProfiler(); // when profiling
+			#end
+		}
+			
 	}
 
 	function addDebugText(text:Dynamic)
