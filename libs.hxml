@@ -1,0 +1,8 @@
+-lib ammer
+-lib flixel:5.3.1
+-lib funkVis
+-lib hxcpp
+-lib hxcpp-debug-server:1.2.4
+-lib instrument
+-lib lime:8.0.2
+-lib openfl:9.2.2

@@ -30,14 +30,13 @@ class PlayState extends FlxState
 		super.create();
 
 		musicList = fillMusicList("assets/music/musicList.txt");
-		FlxG.sound.playMusic("assets/music/" + musicList[1] + ".ogg");
+		FlxG.sound.playMusic("assets/music/" + musicList[3] + ".ogg");
 
 		@:privateAccess
 		musicSrc = cast FlxG.sound.music._channel.__source;
 
 		data = cast musicSrc.buffer.data;
-
-		var visualizer = new Visualizer(new AudioClip(musicSrc), 32);
+		var visualizer = new Visualizer(new AudioClip(musicSrc), 8);
 		add(visualizer);
 
 		debugText = new FlxText(0, 0, 0, "test", 24);
@@ -51,16 +50,16 @@ class PlayState extends FlxState
 		var curIndex = Math.floor(musicSrc.buffer.sampleRate * (FlxG.sound.music.time / 1000));
 		// trace(curIndex / (data.length * 2));
 		// trace(FlxG.sound.music.time / FlxG.sound.music.length);
-		max = Math.max(max, data[curIndex]);
+		// max = Math.max(max, data[curIndex]);
 		debugText.text = "";
 		// refactor below code to use addDebugText function
-		addDebugText(max / 2);
-		addDebugText(musicSrc.buffer.sampleRate);
-		addDebugText(data[curIndex]);
-		addDebugText(FlxG.sound.music.time / FlxG.sound.music.length);
-		addDebugText(curIndex / (data.length / 4));
-		addDebugText((data.length / 4) / musicSrc.buffer.sampleRate);
-		addDebugText(FlxG.sound.music.length / 1000);
+		// addDebugText(max / 2);
+		// addDebugText(musicSrc.buffer.sampleRate);
+		// addDebugText(data[curIndex]);
+		// addDebugText(FlxG.sound.music.time / FlxG.sound.music.length);
+		// addDebugText(curIndex / (data.length / 4));
+		// addDebugText((data.length / 4) / musicSrc.buffer.sampleRate);
+		// addDebugText(FlxG.sound.music.length / 1000);
 		super.update(elapsed);
 
 		if (FlxG.keys.justPressed.SPACE)

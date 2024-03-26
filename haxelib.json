@@ -6,5 +6,8 @@
     "classPath": "src",
     "tags": ["audio", "fft", "visualization"],
     "releasenote": "Initial release",
-    "version": "0.0.1"
+    "version": "0.0.1",
+    "dependencies": {
+        "lime": ""
+    }
 }

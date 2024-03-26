@@ -1,0 +1,5 @@
+common.hxml
+-D ammer.buildPath=build
+-D ammer.outputPath=bin
+--main ammertest.Test
+--hl bin/out.hl
