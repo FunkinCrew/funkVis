@@ -3,6 +3,10 @@ package funkVis.dsp;
 import funkVis.AudioClip;
 import funkVis.Scaling;
 
+
+import funkVis._internal.html5.AnalyzerNode;
+
+
 using Lambda;
 using Math;
 using funkVis.dsp.FFT;
@@ -52,19 +56,45 @@ class SpectralAnalyzer
     var barCount:Int;
     var blackmanWindow = new Array<Float>();
     // public var overlap:Float = 0.1;
-    public var smoothing:Float = 0.5;
-    public var minFreq:Float = 30;
-    public var maxFreq:Float = 20000;
-    public var minDb:Float = -80;
-    public var maxDb:Float = -25;
+    public var smoothing:Float = 0.7;
+    public var minFreq:Float = 50;
+    public var maxFreq:Float = 22000;
+    public var minDb(default, set):Float = -70;
+    public var maxDb(default, set):Float = -20;
+    
+    #if web
+    var htmlAnalyzer:AnalyzerNode;
+    #end
 
     function set_fftN(value:Int):Int
     {
         var pow2 = FFT.nextPow2(value);
 
+        #if web
+        htmlAnalyzer.fftSize = pow2;
+        #end
+
         calcBars(barCount, peakHold);
         resizeBlackmanWindow(pow2);
         return pow2;
+    }
+
+    function set_minDb(value:Float):Float
+    {
+        #if web
+        htmlAnalyzer.minDecibels = value;
+        #end
+
+        return value;
+    }
+
+    function set_maxDb(value:Float):Float
+    {
+        #if web
+        htmlAnalyzer.maxDecibels = value;
+        #end
+
+        return value;
     }
 
     public function new(barCount:Int, audioClip:AudioClip, maxDelta:Float = 0.01, peakHold:Int = 30)
@@ -73,12 +103,15 @@ class SpectralAnalyzer
         this.maxDelta = maxDelta;
         this.peakHold = peakHold;
         this.barCount = barCount;
-        maxFreq = Math.min(maxFreq, audioClip.audioBuffer.sampleRate / 2);
+
+        #if web
+        htmlAnalyzer = new AnalyzerNode(cast audioClip);
+        #end
+        // maxFreq = Math.min(maxFreq, audioClip.audioBuffer.sampleRate / 2);
 
         calcBars(barCount, peakHold);
 
         resizeBlackmanWindow(fftN);
-
     }
 
     function resizeBlackmanWindow(size:Int)
@@ -95,36 +128,37 @@ class SpectralAnalyzer
         return val <= min ? min : val >= max ? max : val;
     }
 
-    private static function writeCSV(name:String, data:Array<Float>)
-    {
-        var output = sys.io.File.write(name, false);
-        output.writeString(data.join("\n"));
-        output.close();
-    }
 
     // For second stage, make this return a second set of recent peaks
     public function getLevels(debugMode:Bool, ?elapsed:Float):Array<Bar>
-    {
+    {   
+        
         var levels = new Array<Bar>();
 
-        var index:Int = audioClip.currentFrame;
+        var index:Int = audioClip.currentFrame ?? 0;
         var indices:Array<Int> = [index];
         var halfStride:Int = Std.int(fftN / 2);
         var stride:Int = Std.int(fftN * smoothing);
         if (index - halfStride > 0) indices = [index - halfStride];
         // if (audioClip.audioBuffer.data.length > index + halfStride) indices = [index + stride];
         var amplitudesSet = new Array<Array<Float>>();
+        var webAmplitudes:Array<Float> = [];
 
         var prevLevels:Array<Float> = previousSTFT;
         var sameAsPrev:Bool = false;
 
         for (index in indices) {
+            #if web
+            var amplitudes:Array<Float> = htmlAnalyzer.getFloatFrequencyData();
+            #else
             var amplitudes = stft(index, elapsed);
+            #end
+            
             // sameAsPrev = amplitudes == prevLevels;
-            if (debugMode) {
-                writeCSV('amplitudes$index.csv', amplitudes);
-            }
+
             amplitudesSet.push(amplitudes);
+            webAmplitudes = amplitudes;
+
         }
 
         // if (sameAsPrev) {
@@ -143,14 +177,40 @@ class SpectralAnalyzer
             var ratioLo = bar.ratioLo;
             var ratioHi = bar.ratioHi;
 
-            var value:Float = Math.max(interpolateDbValues(amplitudesSet[0], binLo, ratioLo), interpolateDbValues(amplitudesSet[0], binHi, ratioHi));
+
+            // javascript already gets the value in decibles
+            #if web
+            var value:Float = minDb;
+            // trace(binLo);
+            // trace(binHi);
 
             for (j in (binLo + 1)...(binHi)) {
+                        
+                // value = Math.max(value, amplitudes[binLo+i]);
+                // var db = amplitudes[j];
+                // trace(db);
+                // value += normalizedB(db);
+                
+                value = Math.max(value, webAmplitudes[Std.int(j / 2)]);
+            }
+            
+            // this isn't for clamping, it's to get a value
+            // between 0 and 1!
+            value = normalizedB(value);
+            
+            #else
+            
+            var value = Math.max(interpolateDbValues(amplitudesSet[0], binLo, ratioLo), interpolateDbValues(amplitudesSet[0], binHi, ratioHi));
+
+            for (j in binLo...binHi) {
                 if (toDb(amplitudesSet[0][j]) > value)
                     value = toDb(amplitudesSet[0][j]);
             }
 
             value = normalizedB(value);
+            #end
+
+            
 
             // for (amplitudes in amplitudesSet) {
             //     for (j in (binLo + 1)...(binHi)) {
@@ -167,10 +227,12 @@ class SpectralAnalyzer
 
             // slew limiting
             var lastValue = bar.recentValues.lastValue;
-            var delta = clamp(value - lastValue, -1 * maxDelta, maxDelta);
-            // if (delta < 0)
+            var delta = value - lastValue;
+            // value = lastValue + (delta * 0.5);
+            // value = lastValue + delta;
+            // if (delta < 0.5)
             // {
-                // value = lastValue + delta;
+            //     value = lastValue + delta;
             // }
             // value = lastValue + delta;
             bar.recentValues.push(value);
@@ -178,10 +240,6 @@ class SpectralAnalyzer
             var recentPeak = bar.recentValues.peak;
 
             levels.push({value: value, peak: recentPeak});
-        }
-
-        if (debugMode) {
-            writeCSV('levels.csv', [for (level in levels) level.value]);
         }
 
         return levels;
@@ -283,7 +341,7 @@ class SpectralAnalyzer
     }
 
     function freqToBin(freq:Float, mathType:MathType = Round):Int
-    {
+    {       
         var bin = freq * fftN / audioClip.audioBuffer.sampleRate;
         return switch (mathType) {
             case Round: Math.round(bin);

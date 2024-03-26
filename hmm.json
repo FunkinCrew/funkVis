@@ -1,0 +1,53 @@
+{
+  "dependencies": [
+    {
+      "name": "ammer",
+      "type": "git",
+      "dir": null,
+      "ref": "master",
+      "url": "https://github.com/Aurel300/ammer"
+    },
+    {
+      "name": "ammer-core",
+      "type": "git",
+      "dir": null,
+      "ref": "dev",
+      "url": "https://github.com/Aurel300/ammer-core"
+    },
+    {
+      "name": "flixel",
+      "type": "haxelib",
+      "version": "5.3.1"
+    },
+    {
+      "name": "funkVis",
+      "type": "haxelib",
+      "version": null
+    },
+    {
+      "name": "hxcpp",
+      "type": "haxelib",
+      "version": null
+    },
+    {
+      "name": "hxcpp-debug-server",
+      "type": "haxelib",
+      "version": "1.2.4"
+    },
+    {
+      "name": "instrument",
+      "type": "haxelib",
+      "version": null
+    },
+    {
+      "name": "lime",
+      "type": "haxelib",
+      "version": "8.0.2"
+    },
+    {
+      "name": "openfl",
+      "type": "haxelib",
+      "version": "9.2.2"
+    }
+  ]
+}

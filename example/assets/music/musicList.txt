@@ -1,3 +1,4 @@
 catStuck
 medlyForAGamer
-secret/funkinTest
+Inst
+charSelectMusic

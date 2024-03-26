@@ -2,3 +2,5 @@ export/
 .haxelib/
 assets/music/copyrightlol
 secret/
+bin/
+build/
