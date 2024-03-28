@@ -51,6 +51,7 @@ class SpectralAnalyzer
     var bars:Array<BarObject> = [];
     var audioClip:AudioClip;
 	public var fftN(default, set):Int = 4096;
+    var fftN2:Int = 2048;
     var maxDelta:Float;
     var peakHold:Int;
     var barCount:Int;
@@ -69,13 +70,14 @@ class SpectralAnalyzer
     function set_fftN(value:Int):Int
     {
         var pow2 = FFT.nextPow2(value);
+        fftN2 = Std.int(pow2 / 2);
 
         #if web
         htmlAnalyzer.fftSize = pow2;
         #end
 
         calcBars(barCount, peakHold);
-        resizeBlackmanWindow(pow2);
+        resizeBlackmanWindow(fftN);
         return pow2;
     }
 
@@ -191,7 +193,7 @@ class SpectralAnalyzer
                 // trace(db);
                 // value += normalizedB(db);
                 
-                value = Math.max(value, webAmplitudes[Std.int(j / 2)]);
+                value = Math.max(value, webAmplitudes[Std.int(j)]);
             }
             
             // this isn't for clamping, it's to get a value
@@ -342,7 +344,7 @@ class SpectralAnalyzer
 
     function freqToBin(freq:Float, mathType:MathType = Round):Int
     {       
-        var bin = freq * fftN / audioClip.audioBuffer.sampleRate;
+        var bin = freq * fftN2 / audioClip.audioBuffer.sampleRate;
         return switch (mathType) {
             case Round: Math.round(bin);
             case Floor: Math.floor(bin);
@@ -357,7 +359,7 @@ class SpectralAnalyzer
     }
 
     function binToFreq(bin)
-		return bin * audioClip.audioBuffer.sampleRate / fftN;
+		return bin * audioClip.audioBuffer.sampleRate / fftN2;
 
     static function calculateBlackmanWindow(n:Int, fftN:Int)
 		return 0.42 - 0.50 * Math.cos(2 * Math.PI * n / (fftN - 1)) + 0.08 * Math.cos(4 * Math.PI * n / (fftN - 1));
@@ -380,7 +382,7 @@ class SpectralAnalyzer
     function freqRangeFilter(i:Int, s:Float)
     {
         final f = binToFreq(i);
-        final binSizeHz = audioClip.audioBuffer.sampleRate / fftN;
+        final binSizeHz = audioClip.audioBuffer.sampleRate / fftN2;
         return f > minFreq - binSizeHz && f < maxFreq + binSizeHz ? s : Math.NEGATIVE_INFINITY;
     }
 
@@ -410,7 +412,7 @@ class SpectralAnalyzer
         currentSmoothedSTFT = [];
         // resizeBlackmanWindow(fftN);
         var updatedSTFT = [
-            for (n in 0...fftN)
+            for (n in 0...fftN2)
                 c + (n * 2) < Std.int(audioClip.audioBuffer.data.length) ? audioClip.audioBuffer.data[Std.int(c + (n * 2))] / 65536.0 : 0 ]
                 .mapi((n, x) -> x * blackmanWindow[n])
                 .rfft()

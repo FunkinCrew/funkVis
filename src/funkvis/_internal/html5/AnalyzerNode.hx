@@ -45,5 +45,6 @@ class AnalyzerNode
         analyzer.getFloatFrequencyData(array);
         return cast array;
         #end
+        return [];
     }
 }
