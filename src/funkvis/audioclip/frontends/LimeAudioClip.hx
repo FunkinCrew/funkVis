@@ -1,4 +1,4 @@
-package;
+package funkVis.audioclip.frontends;
 
 import flixel.FlxG;
 import flixel.math.FlxMath;
