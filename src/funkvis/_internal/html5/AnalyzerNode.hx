@@ -19,6 +19,7 @@ class AnalyzerNode
     public var fftSize:Int = 2048;
     #end
 
+    // #region yoooo
     public function new(?audioClip:AudioClip)
     {
         trace("Loading audioClip");

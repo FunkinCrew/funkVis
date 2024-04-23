@@ -55,7 +55,6 @@ class FFT {
 	}
 
 
-
 	// Radix-2 Decimation-In-Time variant of Cooley–Tukey's FFT, recursive.
 	private static function ditfft2(
 		time:Array<Complex>, t:Int,
@@ -150,16 +149,18 @@ class FFT {
 	{
 		trace("COMPUTING TWIDDLES FOR: " + maxN + " INVERSE: " + inverse);
 		var n:Int = maxN;
-
+		var base_len = maxN;
+		var len = base_len * (1 << ())
 		var twiddles:Array<Complex> = [];
 		// for (k in 0...Std.int(n / 2)) { // n/2 because of symmetry
 		// 	var twiddle:Complex = Complex.exp((inverse ? 1 : -1) * 2 * Math.PI * k / n);
 		// 	twiddles.push(twiddle);
 		// }
 
+		
 		// radix4 twiddles
-		for (k in 0...Std.int(n / 4)) { // n/4 because of symmetry in Radix-4
-			var twiddle:Complex = Complex.exp((inverse ? 1 : -1) * 2 * Math.PI * k / n);
+		for (k in 0...Std.int(n / 2)) { // n/4 because of symmetry in Radix-4
+			var twiddle:Complex = computeTwiddle(k, n, inverse);
 			twiddles.push(twiddle);
 		}
 
@@ -167,6 +168,19 @@ class FFT {
 			twiddleFactorsInversed = twiddles;
 		else		
 			twiddleFactors = twiddles;
+	}
+
+	private static function computeTwiddle(index, fft_len, inverse:Bool = false)
+	{
+		var constant = -2 * Math.PI / fft_len;
+		var angle = constant * index;
+
+		var result:Complex = new Complex(Math.cos(angle), Math.sin(angle));
+
+		if (inverse)
+			return result.conj();
+		else
+			return result;
 	}
 
 	private static function useTwiddleFactor(n:Int, k:Int, inverse:Bool = false):Complex {
