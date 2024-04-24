@@ -30,7 +30,7 @@ class FFT {
 		Hermitian-symmetric so we only return the positive frequencies.
 	**/
 	public static function rfft(input:Array<Float>) : Array<Complex> {
-		checkAndComputeTwiddles(input.length);
+		// checkAndComputeTwiddles(input.length);
 		final s = fft(input.map(Complex.fromReal));
 		return s.slice(0, Std.int(s.length / 2) + 1);
 	}
@@ -50,7 +50,13 @@ class FFT {
 		final n = nextPow2(input.length);
 		var ts = [for (i in 0...n) if (i < input.length) input[i] else Complex.zero];
 		var fs = [for (_ in 0...n) Complex.zero];
-		ditfft2(ts, 0, fs, 0, n, 1, inverse);
+
+		if (inverse && twiddleFactorsInversed?.length != n)
+			precomputeTwiddleFactors(n, true);
+		else if (!inverse && twiddleFactors?.length != n)
+			precomputeTwiddleFactors(n, false);
+
+		ditfft4(ts, 0, fs, 0, n, 1, inverse);
 		return inverse ? fs.map(z -> z.scale(1 / n)) : fs;
 	}
 
@@ -68,7 +74,7 @@ class FFT {
 			ditfft2(time, t,        freq, f,           halfLen, step * 2, inverse);
 			ditfft2(time, t + step, freq, f + halfLen, halfLen, step * 2, inverse);
 			for (k in 0...halfLen) {
-				final twiddle = Complex.exp((inverse ? 1 : -1) * 2 * Math.PI * k / n); 
+				final twiddle = inverse ? twiddleFactorsInversed[k] : twiddleFactors[k]; 
 				final even = freq[f + k].copy();
 				final odd = freq[f + k + halfLen].copy();
 				freq[f + k]           = even + twiddle * odd;
@@ -131,23 +137,12 @@ class FFT {
 		return fs;
 	}
 
-	private static function checkAndComputeTwiddles(n:Int, inverse:Bool = false) : Void {
-		
-		var twiddleLength:Int = inverse ? twiddleFactorsInversed?.length ?? 0 : twiddleFactors?.length ?? 0;
-
-		if (twiddleLength * 4 != n)
-			precomputeTwiddleFactors(n, inverse);
-		
-		
-	}
-
 	private static var twiddleFactorsInversed:Array<Complex>;
 
 	private static var twiddleFactors:Array<Complex>;
 
 	private static function precomputeTwiddleFactors(maxN:Int, inverse:Bool):Void
 	{
-		trace("COMPUTING TWIDDLES FOR: " + maxN + " INVERSE: " + inverse);
 		var n:Int = maxN;
 		var base_len = maxN;
 		var len = base_len * (1 << 2);
@@ -158,7 +153,7 @@ class FFT {
 		// }
 
 		
-		// radix4 twiddles
+		// radix2 twiddles
 		for (k in 0...Std.int(n / 2)) { // n/4 because of symmetry in Radix-4
 			var twiddle:Complex = computeTwiddle(k, n, inverse);
 			twiddles.push(twiddle);
