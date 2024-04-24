@@ -37,7 +37,6 @@
 
 	<haxelib name="flixel" />
 	<haxelib name="funkVis" />
-	<haxelib name="instrument" />
 	<!-- <haxeflag name="macro" value="instrument.Instrumentation.profiling(['funkVis.dsp.FFT'])" /> -->
 	<!-- <haxedef name="profiler-console-hierarchy-reporter" /> -->
 	<!--In case you want to use the addons package-->

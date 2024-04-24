@@ -1,20 +1,6 @@
 {
   "dependencies": [
     {
-      "name": "ammer",
-      "type": "git",
-      "dir": null,
-      "ref": "master",
-      "url": "https://github.com/Aurel300/ammer"
-    },
-    {
-      "name": "ammer-core",
-      "type": "git",
-      "dir": null,
-      "ref": "dev",
-      "url": "https://github.com/Aurel300/ammer-core"
-    },
-    {
       "name": "flixel",
       "type": "haxelib",
       "version": "5.3.1"
