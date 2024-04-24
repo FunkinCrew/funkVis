@@ -150,7 +150,7 @@ class FFT {
 		trace("COMPUTING TWIDDLES FOR: " + maxN + " INVERSE: " + inverse);
 		var n:Int = maxN;
 		var base_len = maxN;
-		var len = base_len * (1 << ())
+		var len = base_len * (1 << 2);
 		var twiddles:Array<Complex> = [];
 		// for (k in 0...Std.int(n / 2)) { // n/2 because of symmetry
 		// 	var twiddle:Complex = Complex.exp((inverse ? 1 : -1) * 2 * Math.PI * k / n);
