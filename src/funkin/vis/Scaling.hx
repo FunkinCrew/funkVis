@@ -1,6 +1,6 @@
-package funkVis;
+package funkin.vis;
 
-import funkVis.LogHelper;
+import funkin.vis.LogHelper;
 
 class Scaling
 {

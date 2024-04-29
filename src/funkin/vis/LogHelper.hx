@@ -1,4 +1,4 @@
-package funkVis;
+package funkin.vis;
 
 class LogHelper
 {

@@ -2,10 +2,10 @@ package;
 
 import flixel.FlxG;
 import flixel.math.FlxMath;
-import funkVis.AudioBuffer;
+import funkin.vis.AudioBuffer;
 import lime.media.AudioSource;
 
-class AudioClip implements funkVis.AudioClip
+class AudioClip implements funkin.vis.AudioClip
 {
 	public var audioBuffer(default, null):AudioBuffer;
     public var currentFrame(get, never):Int;

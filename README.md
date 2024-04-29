@@ -1,4 +1,4 @@
-# FunkVis
+# funkin-vis
 
 ## LICENSE
 

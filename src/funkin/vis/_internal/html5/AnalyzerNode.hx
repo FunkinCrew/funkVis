@@ -1,6 +1,6 @@
-package funkVis._internal.html5;
+package funkin.vis._internal.html5;
 
-import funkVis.AudioBuffer;
+import funkin.vis.AudioBuffer;
 #if lime_howlerjs
 import lime.media.howlerjs.Howl;
 import js.html.audio.AnalyserNode as AnalyseWebAudio;

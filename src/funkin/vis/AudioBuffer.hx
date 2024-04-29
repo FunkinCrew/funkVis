@@ -1,4 +1,4 @@
-package funkVis;
+package funkin.vis;
 
 import lime.utils.UInt16Array;
 

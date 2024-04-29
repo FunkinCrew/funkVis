@@ -5,8 +5,8 @@ import flixel.FlxSprite;
 import flixel.group.FlxGroup;
 import flixel.group.FlxGroup.FlxTypedGroup;
 import flixel.util.FlxColor;
-import funkVis.AudioClip;
-import funkVis.dsp.SpectralAnalyzer;
+import funkin.vis.AudioClip;
+import funkin.vis.dsp.SpectralAnalyzer;
 
 class Visualizer extends FlxGroup
 {
