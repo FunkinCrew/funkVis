@@ -1,4 +1,4 @@
-package funkVis.dsp;
+package funkin.vis.dsp;
 
 using Lambda;
 
