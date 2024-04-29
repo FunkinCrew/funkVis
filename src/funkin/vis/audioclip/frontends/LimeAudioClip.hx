@@ -1,8 +1,8 @@
-package funkVis.audioclip.frontends;
+package funkin.vis.audioclip.frontends;
 
 import flixel.FlxG;
 import flixel.math.FlxMath;
-import funkVis.AudioBuffer;
+import funkin.vis.AudioBuffer;
 import lime.media.AudioSource;
 
 /**
@@ -15,7 +15,7 @@ import lime.media.AudioSource;
  * https://github.com/openfl/openfl/commit/eec48a
  * 
  */
-class LimeAudioClip implements funkVis.AudioClip
+class LimeAudioClip implements funkin.vis.AudioClip
 {
 	public var audioBuffer(default, null):AudioBuffer;
     public var currentFrame(get, never):Int;
