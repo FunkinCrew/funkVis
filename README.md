@@ -1,4 +1,4 @@
-# funkin-vis
+# funkin.vis
 
 ## LICENSE
 
