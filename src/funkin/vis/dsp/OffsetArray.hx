@@ -1,4 +1,4 @@
-package funkVis.dsp;
+package funkin.vis.dsp;
 
 /**
 	A view into an Array with an indexing offset.

@@ -1,11 +1,11 @@
-package funkVis.dsp;
+package funkin.vis.dsp;
 
-import funkVis.dsp.Complex;
+import funkin.vis.dsp.Complex;
 import haxe.ds.Vector;
 
 // these are only used for testing, down in FFT.main()
-using funkVis.dsp.OffsetArray;
-using funkVis.dsp.Signal;
+using funkin.vis.dsp.OffsetArray;
+using funkin.vis.dsp.Signal;
 
 
 /**

@@ -1,4 +1,4 @@
-package funkVis.dsp;
+package funkin.vis.dsp;
 
 // It would be great to make this parameterizable but haxe doesn't seem to have a way to do 
 // a numeric type constraint afaict

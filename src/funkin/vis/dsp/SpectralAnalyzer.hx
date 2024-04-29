@@ -1,15 +1,15 @@
-package funkVis.dsp;
+package funkin.vis.dsp;
 
-import funkVis.AudioClip;
-import funkVis.Scaling;
+import funkin.vis.AudioClip;
+import funkin.vis.Scaling;
 
 
-import funkVis._internal.html5.AnalyzerNode;
+import funkin.vis._internal.html5.AnalyzerNode;
 
 
 using Lambda;
 using Math;
-using funkVis.dsp.FFT;
+using funkin.vis.dsp.FFT;
 
 typedef BarObject =
 {
