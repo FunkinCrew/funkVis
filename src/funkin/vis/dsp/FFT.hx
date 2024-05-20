@@ -85,13 +85,15 @@ class FFT {
 
 	private static function ditfft4(time:Array<Complex>, t:Int, freq:Array<Complex>, f:Int, n:Int, step:Int, inverse:Bool):Void {
 		
-		if (n == 4) {
+		if (n == 2) {
 			// Base case: Compute the 4-point DFT directly
 			for (k in 0...n) {
 				var sum = Complex.zero;
 				for (j in 0...4) {
 					var twiddle = Complex.exp((inverse ? 1 : -1) * 2 * Math.PI * k / n); 
-					sum += time[t + j * step] * twiddle;
+					var index = t + j * step;
+					if(time[index] != null)
+						sum += time[index] * twiddle;
 				}
 				freq[f + k] = sum;
 			}
