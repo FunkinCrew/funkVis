@@ -3,7 +3,7 @@ package funkin.vis.dsp;
 /**
 	Complex number representation.
 **/
-@:forward(real, imag) @:notNull @:pure
+@:forward(real, imag) @:pure
 abstract Complex({
 	final real : Float;
 	final imag : Float;
