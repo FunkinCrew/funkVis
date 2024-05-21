@@ -10,9 +10,6 @@ import lime.media.AudioSource;
 import lime.media.vorbis.VorbisFile;
 import lime.utils.Int16Array;
 import sys.io.File;
-import funkVis.AudioBuffer;
-import funkVis.Scaling;
-import funkVis.LogHelper;
 
 class PlayState extends FlxState
 {
@@ -32,7 +29,7 @@ class PlayState extends FlxState
 
 		data = cast musicSrc.buffer.data;
 
-		var visualizer = new Visualizer(new AudioClip(musicSrc));
+		var visualizer = new Visualizer(musicSrc);
 		add(visualizer);
 
 		debugText = new FlxText(0, 0, 0, "test", 24);

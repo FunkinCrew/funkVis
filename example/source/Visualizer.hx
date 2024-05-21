@@ -5,8 +5,6 @@ import flixel.FlxSprite;
 import flixel.group.FlxGroup;
 import flixel.group.FlxGroup.FlxTypedGroup;
 import flixel.util.FlxColor;
-import funkVis.AudioClip;
-import funkVis.dsp.SpectralAnalyzer;
 
 class Visualizer extends FlxGroup
 {
@@ -14,11 +12,11 @@ class Visualizer extends FlxGroup
     var peakLines:FlxTypedGroup<FlxSprite>;
     var analyzer:SpectralAnalyzer;
 
-    public function new(audioClip:AudioClip, barCount:Int = 8)
+    public function new(audioClip:lime.media.AudioSource, barCount:Int = 16)
     {
         super();
 
-        analyzer = new SpectralAnalyzer(barCount, audioClip, 0.005, 30);
+        analyzer = new SpectralAnalyzer(audioClip, barCount);
         grpBars = new FlxTypedGroup<FlxSprite>();
 		add(grpBars);
         peakLines = new FlxTypedGroup<FlxSprite>();
@@ -34,7 +32,8 @@ class Visualizer extends FlxGroup
 		}
     }
 
-    static inline function min(x:Int, y:Int):Int
+    @:generic
+    static public inline function min<T:Float>(x:T, y:T):T
     {
         return x > y ? y : x;
     }
@@ -42,10 +41,11 @@ class Visualizer extends FlxGroup
     override function draw()
     {
         var levels = analyzer.getLevels();
+        // trace(levels);
 
         for (i in 0...min(grpBars.members.length, levels.length)) {
-            grpBars.members[i].scale.y = levels[i].value;
-            peakLines.members[i].y = FlxG.height - (levels[i].peak * FlxG.height);
+            grpBars.members[i].scale.y = levels[i];
+            // peakLines.members[i].y = FlxG.height - (levels[i].peak * FlxG.height);
         }
         super.draw();
     }
