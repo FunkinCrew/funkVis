@@ -43,9 +43,13 @@ class SpectralAnalyzer
 
 	public function getLevels():Array<Bar>
 	{
-		var wantedLength = fftN * Std.int(audioSource.buffer.bitsPerSample / 8) * numChannels;
+        var numOctets = Std.int(audioSource.buffer.bitsPerSample / 8);
+		var wantedLength = fftN * numOctets * numChannels;
 		var startFrame = currentFrame;
-        if (startFrame % 2 != 0) startFrame++;
+        var offset = startFrame % numOctets;
+        if (offset != 0) {
+            startFrame -= offset;
+        }
 		var segment = audioSource.buffer.data.subarray(startFrame, min(startFrame + wantedLength, audioSource.buffer.data.length));
 		var signal = segment.toInterleaved(audioSource.buffer.bitsPerSample);
 
