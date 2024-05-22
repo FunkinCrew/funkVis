@@ -5,6 +5,7 @@ import flixel.FlxSprite;
 import flixel.group.FlxGroup;
 import flixel.group.FlxGroup.FlxTypedGroup;
 import flixel.util.FlxColor;
+import funkVis.dsp.SpectralAnalyzer;
 
 class Visualizer extends FlxGroup
 {
@@ -44,8 +45,8 @@ class Visualizer extends FlxGroup
         // trace(levels);
 
         for (i in 0...min(grpBars.members.length, levels.length)) {
-            grpBars.members[i].scale.y = levels[i];
-            // peakLines.members[i].y = FlxG.height - (levels[i].peak * FlxG.height);
+            grpBars.members[i].scale.y = levels[i].value;
+            peakLines.members[i].y = FlxG.height - (levels[i].peak * FlxG.height);
         }
         super.draw();
     }
