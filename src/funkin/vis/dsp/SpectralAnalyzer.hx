@@ -56,7 +56,7 @@ class SpectralAnalyzer
 			for (i in 0...mixed.length) {
 				mixed[i] = 0.0;
 				for (c in 0...numChannels) {
-					mixed[i] += signal[i*numChannels+c];
+					mixed[i] += 0.7 * signal[i*numChannels+c];
                     break;
 				}
                 mixed[i] *= blackmanWindow[i];
