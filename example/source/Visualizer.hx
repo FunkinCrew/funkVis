@@ -43,7 +43,7 @@ class Visualizer extends FlxGroup
 
     override function draw()
     {
-        var levels = analyzer.getLevels(debugMode, FlxG.elapsed);
+        var levels = analyzer.getLevels();
 
         for (i in 0...min(grpBars.members.length, levels.length)) {
             grpBars.members[i].scale.y = levels[i].value;
