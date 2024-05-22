@@ -36,6 +36,7 @@
 	<!-- _______________________________ Libraries ______________________________ -->
 
 	<haxelib name="flixel" />
+	<haxelib name="grig.audio" />
 	<haxelib name="funkVis" />
 
 	<!--In case you want to use the addons package-->

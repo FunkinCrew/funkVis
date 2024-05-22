@@ -19,28 +19,35 @@ class SpectralAnalyzer
     public var currentFrame(get, never):Int;
 	public var numChannels(get, never):Int;
 	private var audioSource:lime.media.AudioSource;
-	private static final n:Int = 512;
-    private var fft = new FFT(n);
+	private static final fftN:Int = 512;
+    private var fft = new FFT(fftN);
 	private var vis = new FFTVisualization();
 	private var barCount:Int;
     private var barHistories = new Array<RecentPeakFinder>();
     private var maxDelta:Float;
     private var peakHold:Int;
+    private var blackmanWindow = new Array<Float>();
 
-	public function new(audioSource:lime.media.AudioSource, barCount:Int, maxDelta:Float = 0.01, peakHold:Int = 30)
+	public function new(audioSource:lime.media.AudioSource, barCount:Int, maxDelta:Float = 0.1, peakHold:Int = 30)
 	{
 		this.audioSource = audioSource;
 		this.barCount = barCount;
         this.maxDelta = maxDelta;
         this.peakHold = peakHold;
-		// this.audioBuffer = new AudioBuffer(data, audioSource.buffer.sampleRate);
+
+        blackmanWindow.resize(fftN);
+        for (i in 0...fftN) {
+            blackmanWindow[i] = calculateBlackmanWindow(i, fftN);
+        }
 	}
 
 	public function getLevels():Array<Bar>
 	{
-		var wantedLength = n * Std.int(audioSource.buffer.bitsPerSample / 8) * numChannels;
+		var wantedLength = fftN * Std.int(audioSource.buffer.bitsPerSample / 8) * numChannels;
 		var startFrame = currentFrame;
+        if (startFrame % 2 != 0) startFrame++;
 		var segment = audioSource.buffer.data.subarray(startFrame, Visualizer.min(startFrame + wantedLength, audioSource.buffer.data.length - startFrame));
+        // trace([for (i in 0...Std.int(segment.length/2)) segment.getInt16(i*2)]);
 		var signal = segment.toInterleaved(audioSource.buffer.bitsPerSample);
 
 		if (numChannels > 1) {
@@ -50,7 +57,9 @@ class SpectralAnalyzer
 				mixed[i] = 0.0;
 				for (c in 0...numChannels) {
 					mixed[i] += signal[i*numChannels+c];
+                    break;
 				}
+                mixed[i] *= blackmanWindow[i];
 			}
 			signal = mixed;
 		}
@@ -89,7 +98,7 @@ class SpectralAnalyzer
 
 	private function get_currentFrame():Int
 	{
-		return Std.int(FlxMath.remapToRange(FlxG.sound.music.time, 0, FlxG.sound.music.length, 0, audioSource.buffer.data.length / 2));
+		return Std.int(FlxMath.remapToRange(FlxG.sound.music.time, 0, FlxG.sound.music.length, 0, audioSource.buffer.data.length / audioSource.buffer.channels));
 	}
 
 	private inline function get_numChannels():Int
@@ -101,6 +110,11 @@ class SpectralAnalyzer
     static inline function clamp<T:Float>(val:T, min:T, max:T):T
     {
         return val <= min ? min : val >= max ? max : val;
+    }
+
+    static function calculateBlackmanWindow(n:Int, fftN:Int)
+    {
+		return 0.42 - 0.50 * Math.cos(2 * Math.PI * n / (fftN - 1)) + 0.08 * Math.cos(4 * Math.PI * n / (fftN - 1));
     }
 }
 
