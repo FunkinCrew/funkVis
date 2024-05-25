@@ -6,6 +6,7 @@ import flixel.group.FlxGroup;
 import flixel.group.FlxGroup.FlxTypedGroup;
 import flixel.util.FlxColor;
 import funkin.vis.dsp.SpectralAnalyzer;
+import lime.media.AudioSource;
 
 class Visualizer extends FlxGroup
 {
@@ -14,11 +15,11 @@ class Visualizer extends FlxGroup
     var analyzer:SpectralAnalyzer;
     var debugMode:Bool = false;
 
-    public function new(audioClip:lime.media.AudioSource, barCount:Int = 16)
+    public function new(audioSource:AudioSource, barCount:Int = 16)
     {
         super();
 
-        analyzer = new SpectralAnalyzer(audioClip, barCount, 0.1, 10);
+        analyzer = new SpectralAnalyzer(audioSource, barCount, 0.1, 10);
 
         grpBars = new FlxTypedGroup<FlxSprite>();
 		add(grpBars);
