@@ -3,9 +3,6 @@ package;
 import flixel.FlxG;
 import flixel.FlxState;
 import flixel.text.FlxText;
-import funkin.vis.AudioBuffer;
-import funkin.vis.LogHelper;
-import funkin.vis.Scaling;
 import haxe.io.BytesInput;
 import haxe.io.Input;
 import haxe.io.UInt16Array;
@@ -36,7 +33,8 @@ class PlayState extends FlxState
 		musicSrc = cast FlxG.sound.music._channel.__source;
 
 		data = cast musicSrc.buffer.data;
-		var visualizer = new Visualizer(new AudioClip(musicSrc), 8);
+
+		var visualizer = new Visualizer(musicSrc);
 		add(visualizer);
 
 		debugText = new FlxText(0, 0, 0, "test", 24);
@@ -69,7 +67,6 @@ class PlayState extends FlxState
 			instrument.profiler.Profiler.endProfiler(); // when profiling
 			#end
 		}
-			
 	}
 
 	function addDebugText(text:Dynamic)

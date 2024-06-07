@@ -11,7 +11,5 @@ class AudioBuffer
     {
         this.data = data;
         this.sampleRate = sampleRate;
-        trace(sampleRate);
-
     }
 }

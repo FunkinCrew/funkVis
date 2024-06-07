@@ -1,6 +1,7 @@
 export/
 .haxelib/
 assets/music/copyrightlol
+.DS_Store
 secret/
 bin/
 build/

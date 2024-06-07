@@ -5,8 +5,8 @@ import flixel.FlxSprite;
 import flixel.group.FlxGroup;
 import flixel.group.FlxGroup.FlxTypedGroup;
 import flixel.util.FlxColor;
-import funkin.vis.AudioClip;
 import funkin.vis.dsp.SpectralAnalyzer;
+import lime.media.AudioSource;
 
 class Visualizer extends FlxGroup
 {
@@ -15,11 +15,12 @@ class Visualizer extends FlxGroup
     var analyzer:SpectralAnalyzer;
     var debugMode:Bool = false;
 
-    public function new(audioClip:AudioClip, barCount:Int = 8)
+    public function new(audioSource:AudioSource, barCount:Int = 16)
     {
         super();
 
-        analyzer = new SpectralAnalyzer(barCount, audioClip, 0.01, 30);
+        analyzer = new SpectralAnalyzer(audioSource, barCount, 0.1, 10);
+
         grpBars = new FlxTypedGroup<FlxSprite>();
 		add(grpBars);
         peakLines = new FlxTypedGroup<FlxSprite>();
@@ -35,14 +36,15 @@ class Visualizer extends FlxGroup
 		}
     }
 
-    static inline function min(x:Int, y:Int):Int
+    @:generic
+    static inline function min<T:Float>(x:T, y:T):T
     {
         return x > y ? y : x;
     }
 
     override function draw()
     {
-        var levels = analyzer.getLevels(debugMode, FlxG.elapsed);
+        var levels = analyzer.getLevels();
 
         for (i in 0...min(grpBars.members.length, levels.length)) {
             grpBars.members[i].scale.y = levels[i].value;
