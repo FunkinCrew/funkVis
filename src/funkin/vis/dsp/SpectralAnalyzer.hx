@@ -58,7 +58,7 @@ class SpectralAnalyzer
     #end
 
     private function freqToBin(freq:Float, mathType:MathType = Round):Int
-    {       
+    {
         var bin = freq * fftN2 / audioClip.audioBuffer.sampleRate;
         return switch (mathType) {
             case Round: Math.round(bin);
@@ -213,14 +213,16 @@ class SpectralAnalyzer
 
 		var range = 16;
         var freqs = fft.calcFreq(signal);
-		var bars = vis.makeLogGraph(freqs, barCount, Math.floor(maxDb - minDb), range);
+		var bars = vis.makeLogGraph(freqs, barCount + 1, Math.floor(maxDb - minDb), range);
 
-        if (bars.length > barHistories.length) {
-            barHistories.resize(bars.length);
+        if (bars.length - 1 > barHistories.length) {
+            barHistories.resize(bars.length - 1);
         }
 
-        levels.resize(bars.length);
-        for (i in 0...bars.length) {
+
+        levels.resize(bars.length-1);
+        for (i in 0...bars.length-1) {
+
             if (barHistories[i] == null) barHistories[i] = new RecentPeakFinder();
             var recentValues = barHistories[i];
             var value = bars[i] / range;
