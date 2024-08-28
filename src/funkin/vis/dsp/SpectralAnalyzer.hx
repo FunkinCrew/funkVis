@@ -151,7 +151,7 @@ class SpectralAnalyzer
 	{
         this.soundInstance = soundInstance;
 		this.audioClip = new LimeAudioClip(soundInstance);
-        this.audioSource = this.audioSource;
+        this.audioSource = audioClip.audioSource;
 		this.barCount = barCount;
         this.maxDelta = maxDelta;
         this.peakHold = peakHold;
