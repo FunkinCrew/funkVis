@@ -348,7 +348,7 @@ class SpectralAnalyzer
         if(audioClip != null)
         {
 		    audioClip.soundInstance = soundInstance;
-            audioSource = audioSource;
+            audioSource = audioClip.audioSource;
         }
         return soundInstance;
     }
