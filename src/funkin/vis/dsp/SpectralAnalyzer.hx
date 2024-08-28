@@ -2,6 +2,7 @@ package funkin.vis.dsp;
 
 import flixel.FlxG;
 import flixel.math.FlxMath;
+import flixel.sound.FlxSound;
 import funkin.vis._internal.html5.AnalyzerNode;
 import funkin.vis.audioclip.frontends.LimeAudioClip;
 import grig.audio.FFT;
@@ -40,9 +41,14 @@ class SpectralAnalyzer
     public var fftN(default, set):Int = 4096;
     public var minFreq:Float = 50;
     public var maxFreq:Float = 22000;
+	public var soundInstance(default, set):FlxSound;
     // Awkwardly, we'll have to interfaces for now because there's too much platform specific stuff we need
     private var audioSource:AudioSource;
+    #if lime
+    private var audioClip:LimeAudioClip;
+    #else
     private var audioClip:AudioClip;
+    #end
 	private var barCount:Int;
     private var maxDelta:Float;
     private var peakHold:Int;
@@ -141,10 +147,11 @@ class SpectralAnalyzer
         #end
     }
 
-	public function new(audioSource:AudioSource, barCount:Int, maxDelta:Float = 0.01, peakHold:Int = 30)
+	public function new(soundInstance:FlxSound, barCount:Int, maxDelta:Float = 0.01, peakHold:Int = 30)
 	{
-        this.audioSource = audioSource;
-		this.audioClip = new LimeAudioClip(audioSource);
+        this.soundInstance = soundInstance;
+		this.audioClip = new LimeAudioClip(soundInstance);
+        this.audioSource = audioClip.audioSource;
 		this.barCount = barCount;
         this.maxDelta = maxDelta;
         this.peakHold = peakHold;
@@ -333,5 +340,16 @@ class SpectralAnalyzer
         calcBars(barCount, peakHold);
         resizeBlackmanWindow(fftN);
         return pow2;
+    }
+
+    function set_soundInstance(value:FlxSound):FlxSound
+    {
+        soundInstance = value;
+        if(audioClip != null)
+        {
+		    audioClip.soundInstance = soundInstance;
+            audioSource = audioClip.audioSource;
+        }
+        return soundInstance;
     }
 }
