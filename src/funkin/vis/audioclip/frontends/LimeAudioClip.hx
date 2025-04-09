@@ -1,5 +1,6 @@
 package funkin.vis.audioclip.frontends;
 
+import haxe.Int64;
 import flixel.FlxG;
 import flixel.math.FlxMath;
 import funkin.vis.AudioBuffer;
@@ -20,32 +21,61 @@ class LimeAudioClip implements funkin.vis.AudioClip
 	public var audioBuffer(default, null):AudioBuffer;
     public var currentFrame(get, never):Int;
 	public var source:Dynamic;
+	public var streamed:Bool;
 
 	public function new(audioSource:AudioSource)
 	{
-		var data:lime.utils.UInt16Array = cast audioSource.buffer.data;
+		var limeBuffer = audioSource.buffer;
+		var data:lime.utils.UInt16Array = cast limeBuffer.data;
 
 		#if web
-		var sampleRate:Float = audioSource.buffer.src._sounds[0]._node.context.sampleRate;
+		streamed = false;
+
+		var sampleRate:Float = limeBuffer.src._sounds[0]._node.context.sampleRate;
+		var length:Int = audioSource.length;
+		var bitsPerSample:Int = 32;
+		var channels:Int = 2;
 		#else
-		var sampleRate = audioSource.buffer.sampleRate;
+		var sampleRate:Float = 0;
+		var length:Int = 0;
+		var bitsPerSample:Int = 0;
+		var channels:Int = 0;
+
+		#if lime_vorbis
+		// If we have a ref to a VorbisFile it should be safe to assume
+		// this is a streamed sound!
+		@:privateAccess
+		if (limeBuffer.__srcVorbisFile != null)
+		{
+			streamed = true;
+
+			var vorbisFile = limeBuffer.__srcVorbisFile;
+			var vorbisInfo = vorbisFile.info();
+			
+			sampleRate = vorbisInfo.rate;
+			bitsPerSample = 16;
+			length = Std.int(Int64.toInt(vorbisFile.pcmTotal()) * vorbisInfo.channels * (bitsPerSample / 8));
+			channels = vorbisInfo.channels;
+		}
+		else
+		#end
+		{
+			streamed = false;
+
+			sampleRate = limeBuffer.sampleRate;
+			bitsPerSample = limeBuffer.bitsPerSample;
+			length = limeBuffer.data.length;
+			channels = limeBuffer.channels;
+		}
 		#end
 
-		this.audioBuffer = new AudioBuffer(data, sampleRate);
+		this.audioBuffer = new AudioBuffer(data, sampleRate, length, bitsPerSample, channels);
 		this.source = audioSource.buffer.src;
 	}
 
 	private function get_currentFrame():Int
 	{
-		var dataLength:Int = 0;
-
-		#if web
-		dataLength = source.length;
-		#else
-		dataLength = audioBuffer.data.length;
-		#end
-
-		var value = Std.int(FlxMath.remapToRange(FlxG.sound.music.time, 0, FlxG.sound.music.length, 0, dataLength));
+		var value = Std.int(FlxMath.remapToRange(FlxG.sound.music.time, 0, FlxG.sound.music.length, 0, audioBuffer.length));
 
 		if (value < 0)
 			return -1;
