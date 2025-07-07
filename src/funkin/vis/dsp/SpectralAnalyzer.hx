@@ -7,6 +7,7 @@ import funkin.vis.audioclip.frontends.LimeAudioClip;
 import grig.audio.FFT;
 import grig.audio.FFTVisualization;
 import lime.media.AudioSource;
+import funkin.vis.dsp.FFT as DspFFT;
 
 using grig.audio.lime.UInt8ArrayTools;
 
@@ -333,7 +334,7 @@ class SpectralAnalyzer
     function set_fftN(value:Int):Int
     {
         fftN = value;
-        var pow2 = FFT.nextPow2(value);
+        var pow2 = DspFFT.nextPow2(value);
         fftN2 = Std.int(pow2 / 2);
 
         #if web
