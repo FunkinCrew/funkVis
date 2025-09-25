@@ -56,6 +56,8 @@ class SpectralAnalyzer
     private var barHistories = new Array<RecentPeakFinder>();
     private var blackmanWindow = new Array<Float>();
     #end
+    private var _logGraphCache:Array<Int> = [];
+    private var _mixedCache:Array<Float> = [];
 
     private function freqToBin(freq:Float, mathType:MathType = Round):Int
     {
@@ -206,33 +208,33 @@ class SpectralAnalyzer
 		var signal = getSignal(segment, audioSource.buffer.bitsPerSample);
 
 		if (audioSource.buffer.channels > 1) {
-			var mixed = new Array<Float>();
-			mixed.resize(Std.int(signal.length / audioSource.buffer.channels));
-			for (i in 0...mixed.length) {
-				mixed[i] = 0.0;
+			_mixedCache.resize(Std.int(signal.length / audioSource.buffer.channels));
+			for (i in 0..._mixedCache.length) {
+				_mixedCache[i] = 0.0;
 				for (c in 0...audioSource.buffer.channels) {
-					mixed[i] += 0.7 * signal[i*audioSource.buffer.channels+c];
+					_mixedCache[i] += 0.7 * signal[i*audioSource.buffer.channels+c];
 				}
-                mixed[i] *= blackmanWindow[i];
+                _mixedCache[i] *= blackmanWindow[i];
 			}
-			signal = mixed;
+			signal = _mixedCache;
 		}
 
 		var range = 16;
         var freqs = fft.calcFreq(signal);
-		var bars = vis.makeLogGraph(freqs, barCount + 1, Math.floor(maxDb - minDb), range);
 
-        if (bars.length - 1 > barHistories.length) {
-            barHistories.resize(bars.length - 1);
+		_logGraphCache = vis.makeLogGraph(freqs, barCount + 1, Math.floor(maxDb - minDb), range, _logGraphCache);
+
+        if (_logGraphCache.length - 1 > barHistories.length) {
+            barHistories.resize(_logGraphCache.length - 1);
         }
 
 
-        levels.resize(bars.length-1);
-        for (i in 0...bars.length-1) {
+        levels.resize(_logGraphCache.length-1);
+        for (i in 0..._logGraphCache.length-1) {
 
             if (barHistories[i] == null) barHistories[i] = new RecentPeakFinder();
             var recentValues = barHistories[i];
-            var value = bars[i] / range;
+            var value = _logGraphCache[i] / range;
 
             // slew limiting
             var lastValue = recentValues.lastValue;
