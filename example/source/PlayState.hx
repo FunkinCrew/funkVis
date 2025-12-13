@@ -7,9 +7,14 @@ import haxe.io.BytesInput;
 import haxe.io.Input;
 import haxe.io.UInt16Array;
 import lime.media.AudioSource;
-import lime.media.vorbis.VorbisFile;
 import lime.utils.Int16Array;
 import openfl.utils.Assets;
+
+#if STREAM
+import lime.media.vorbis.VorbisFile;
+import lime.media.AudioBuffer;
+import openfl.media.Sound;
+#end
 
 using StringTools;
 
@@ -27,10 +32,17 @@ class PlayState extends FlxState
 		super.create();
 
 		// musicList = fillMusicList("assets/music/musicList.txt");
+
+		#if STREAM
+		var vorbis = VorbisFile.fromFile("assets/music/catStuck.ogg");
+		var buffer = AudioBuffer.fromVorbisFile(vorbis);
+		FlxG.sound.playMusic(Sound.fromAudioBuffer(buffer));
+		#else
 		FlxG.sound.playMusic("assets/music/catStuck.ogg");
+		#end
 
 		@:privateAccess
-		musicSrc = cast FlxG.sound.music._channel.__source;
+		musicSrc = cast #if (openfl < "9.3.2") FlxG.sound.music._channel.__source #else FlxG.sound.music._channel.__audioSource #end;
 
 		data = cast musicSrc.buffer.data;
 
