@@ -1,8 +1,6 @@
 package funkin.vis._internal.html5;
 
-import flixel.FlxG;
 import funkin.vis.AudioClip;
-import funkin.vis.AudioBuffer;
 #if lime_howlerjs
 import lime.media.howlerjs.Howl;
 import lime.media.howlerjs.Howler;
@@ -38,17 +36,6 @@ class AnalyzerNode
         analyzer = new AnalyseWebAudio(ctx);
         howl.on("play", onHowlPlay);
 
-        // trace(node.bufferSource);
-        // untyped console.log(node);
-
-        // analyzer = new AnalyseWebAudio(audioClip.source._sounds[0]._node.context);
-        // audioClip.source._sounds[0]._node.connect(analyzer);
-
-        // trace(audioClip.source._sounds[0]._node.context.sampleRate);
-        // trace(analyzer);
-        // trace(analyzer.fftSize);
-        // howler = cast buffer.source;
-        // trace(howler);
         getFloatFrequencyData();
         #end
     }
