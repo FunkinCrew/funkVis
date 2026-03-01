@@ -5,7 +5,7 @@ package funkin.vis;
  */
 interface AudioClip
 {
-    public var audioBuffer(default, null):AudioBuffer;
-    public var currentFrame(get, never):Int;
-    public var source:Dynamic;
+    public var channels(get, never):Int;
+    public var sampleRate(get, never):Int;
+    public function getTimeDomainData(fftN:Int):Array<Float>;
 }
