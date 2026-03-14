@@ -2,11 +2,14 @@ package funkin.vis.dsp;
 
 import flixel.FlxG;
 import flixel.math.FlxMath;
-import funkin.vis._internal.html5.AnalyzerNode;
 import funkin.vis.audioclip.frontends.LimeAudioClip;
 import grig.audio.FFT;
 import grig.audio.FFTVisualization;
 import lime.media.AudioSource;
+
+#if web
+import funkin.vis._internal.html5.AnalyzerNode;
+#end
 
 using grig.audio.lime.UInt8ArrayTools;
 
@@ -41,7 +44,7 @@ class SpectralAnalyzer
     public var minFreq:Float = 50;
     public var maxFreq:Float = 22000;
     // Awkwardly, we'll have to interfaces for now because there's too much platform specific stuff we need
-    private var audioSource:AudioSource;
+    private var audioSource(get, set):AudioSource;
     private var audioClip:AudioClip;
 	private var barCount:Int;
     private var maxDelta:Float;
@@ -61,7 +64,7 @@ class SpectralAnalyzer
 
     private function freqToBin(freq:Float, mathType:MathType = Round):Int
     {
-        var bin = freq * fftN2 / audioClip.audioBuffer.sampleRate;
+        var bin = freq * fftN2 / audioClip.sampleRate;
         return switch (mathType) {
             case Round: Math.round(bin);
             case Floor: Math.floor(bin);
@@ -145,14 +148,13 @@ class SpectralAnalyzer
 
 	public function new(audioSource:AudioSource, barCount:Int, maxDelta:Float = 0.01, peakHold:Int = 30)
 	{
-        this.audioSource = audioSource;
 		this.audioClip = new LimeAudioClip(audioSource);
 		this.barCount = barCount;
         this.maxDelta = maxDelta;
         this.peakHold = peakHold;
 
         #if web
-        htmlAnalyzer = new AnalyzerNode(audioClip);
+        htmlAnalyzer = new AnalyzerNode(cast audioClip);
         #else
         fft = new FFT(fftN);
         #end
@@ -165,16 +167,19 @@ class SpectralAnalyzer
 	{
         if(levels == null) levels = new Array<Bar>();
         #if web
-        var amplitudes:Array<Float> = htmlAnalyzer.getFloatFrequencyData();
+        var amplitudes:lime.utils.Float32Array = htmlAnalyzer.getFloatFrequencyData();
+        untyped console.log(amplitudes);
 
         for (i in 0...bars.length) {
             var bar = bars[i];
             var binLo = bar.binLo;
             var binHi = bar.binHi;
+            trace(bar, binLo, binHi);
 
             var value:Float = minDb;
             for (j in (binLo + 1)...(binHi)) {
                 value = Math.max(value, amplitudes[Std.int(j)]);
+                trace(value);
             }
 
             // this isn't for clamping, it's to get a value
@@ -193,34 +198,12 @@ class SpectralAnalyzer
 
         return levels;
         #else
-        var numOctets = Std.int(audioSource.buffer.bitsPerSample / 8);
-		var wantedLength = fftN * numOctets * audioSource.buffer.channels;
-		var startFrame = audioClip.currentFrame;
+        var buffer = audioClip.getTimeDomainData(fftN);
 
-        if (startFrame < 0)
+        for (i in 0...fftN)
         {
-            return levels = [for (bar in 0...barCount) {value: 0, peak: 0}];
+            _mixedCache[i] = buffer[i] * blackmanWindow[i];
         }
-
-        startFrame -= startFrame % numOctets;
-        var segment = audioSource.buffer.data.subarray(startFrame, min(startFrame + wantedLength, audioSource.buffer.data.length));
-
-		getSignal(segment, audioSource.buffer.bitsPerSample); // Sets _buffer
-
-		if (audioSource.buffer.channels > 1) {
-            var wantedArrayLength = Std.int(_buffer.length / audioSource.buffer.channels);
-            if (_mixedCache.length != wantedArrayLength)
-			    _mixedCache.resize(wantedArrayLength);
-
-			for (i in 0..._mixedCache.length) {
-				_mixedCache[i] = 0.0;
-				for (c in 0...audioSource.buffer.channels) {
-					_mixedCache[i] += 0.7 * _buffer[i*audioSource.buffer.channels+c];
-				}
-                _mixedCache[i] *= blackmanWindow[i];
-			}
-			//_buffer = _mixedCache;
-		}
 
 		var range = 16;
         var freqs = fft.calcFreq(_mixedCache);
@@ -344,5 +327,15 @@ class SpectralAnalyzer
         calcBars(barCount, peakHold);
         resizeBlackmanWindow(fftN);
         return pow2;
+    }
+
+    function get_audioSource():AudioSource
+    {
+        return if (audioClip is LimeAudioClip) (cast audioClip :LimeAudioClip).audioSource; else null;
+    }
+
+    function set_audioSource(value:AudioSource):AudioSource
+    {
+        return if (audioClip is LimeAudioClip) (cast audioClip :LimeAudioClip).audioSource = value; else value;
     }
 }
