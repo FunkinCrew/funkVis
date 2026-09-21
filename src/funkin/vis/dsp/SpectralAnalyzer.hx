@@ -194,17 +194,25 @@ class SpectralAnalyzer
         return levels;
         #else
         var numOctets = Std.int(audioSource.buffer.bitsPerSample / 8);
-		var wantedLength = fftN * numOctets * audioSource.buffer.channels;
-		var startFrame = audioClip.currentFrame;
+        var channels = audioSource.buffer.channels;
+        var wantedLength = fftN * numOctets * channels;
+        var startFrame = audioClip.currentFrame;
 
         if (startFrame < 0)
-        {
             return levels = [for (bar in 0...barCount) {value: 0, peak: 0}];
-        }
 
-        startFrame -= startFrame % numOctets;
-        var segment = audioSource.buffer.data.subarray(startFrame, min(startFrame + wantedLength, audioSource.buffer.data.length));
+        var dataLength = audioSource.buffer.data.length;
 
+        // Make sure its a goddamn complete frame!
+        var frameSize = numOctets * channels;
+        var startByte = startFrame - (startFrame % frameSize);
+
+        if (startByte >= dataLength)
+            return levels = [for (bar in 0...barCount) {value: 0, peak: 0}];
+
+        var endByte = min(startByte + wantedLength, dataLength);
+
+        var segment = audioSource.buffer.data.subarray(startByte, endByte);
 		getSignal(segment, audioSource.buffer.bitsPerSample); // Sets _buffer
 
 		if (audioSource.buffer.channels > 1) {
