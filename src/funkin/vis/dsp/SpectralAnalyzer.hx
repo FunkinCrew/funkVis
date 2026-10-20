@@ -193,6 +193,7 @@ class SpectralAnalyzer
 
         return levels;
         #else
+        var data:lime.utils.Int16Array = cast audioSource.buffer.data;
         var numOctets = Std.int(audioSource.buffer.bitsPerSample / 8);
         var channels = audioSource.buffer.channels;
         var wantedLength = fftN * numOctets * channels;
@@ -201,7 +202,7 @@ class SpectralAnalyzer
         if (startFrame < 0)
             return levels = [for (bar in 0...barCount) {value: 0, peak: 0}];
 
-        var dataLength = audioSource.buffer.data.length;
+        var dataLength = data.length;
 
         // Make sure its a goddamn complete frame!
         var frameSize = numOctets * channels;
@@ -212,7 +213,7 @@ class SpectralAnalyzer
 
         var endByte = min(startByte + wantedLength, dataLength);
 
-        var segment = audioSource.buffer.data.subarray(startByte, endByte);
+        var segment = data.subarray(startByte, endByte);
 		getSignal(segment, audioSource.buffer.bitsPerSample); // Sets _buffer
 
 		if (audioSource.buffer.channels > 1) {
