@@ -2,86 +2,42 @@ package;
 
 import flixel.FlxG;
 import flixel.FlxState;
-import flixel.text.FlxText;
-import haxe.io.BytesInput;
-import haxe.io.Input;
-import haxe.io.UInt16Array;
-import lime.media.AudioSource;
-import lime.media.vorbis.VorbisFile;
-import lime.utils.Int16Array;
-import openfl.utils.Assets;
-
-using StringTools;
+import openfl.display.FPS;
 
 class PlayState extends FlxState
 {
-	var musicSrc:AudioSource;
-	var data:lime.utils.UInt16Array;
-
-	var debugText:FlxText;
-
-	var musicList:Array<String> = [];
-
-	override public function create()
+	override function create():Void
 	{
-		super.create();
+		FlxG.autoPause = false;
 
-		// musicList = fillMusicList("assets/music/musicList.txt");
-		FlxG.sound.playMusic("assets/music/catStuck.ogg");
+		FlxG.mouse.useSystemCursor = true;
+
+		FlxG.game.addChild(new FPS(10, 10, 0xFFFFFFFF));
+
+		FlxG.game.focusLostFramerate = 60;
+
+		FlxG.sound.playMusic('assets/medlyForAGamer.ogg');
 
 		@:privateAccess
-		musicSrc = cast FlxG.sound.music._channel.__source;
+		add(new Visualizer(FlxG.sound.music._source));
 
-		data = cast musicSrc.buffer.data;
-
-		var visualizer = new Visualizer(musicSrc);
-		add(visualizer);
-
-		debugText = new FlxText(0, 0, 0, "test", 24);
-		// add(debugText);
+		super.create();
 	}
 
-	var max:Float = 0;
-
-	override public function update(elapsed:Float)
+	override function update(elapsed:Float):Void
 	{
-		var curIndex = Math.floor(musicSrc.buffer.sampleRate * (FlxG.sound.music.time / 1000));
-		// trace(curIndex / (data.length * 2));
-		// trace(FlxG.sound.music.time / FlxG.sound.music.length);
-		// max = Math.max(max, data[curIndex]);
-		debugText.text = "";
-		// refactor below code to use addDebugText function
-		// addDebugText(max / 2);
-		// addDebugText(musicSrc.buffer.sampleRate);
-		// addDebugText(data[curIndex]);
-		// addDebugText(FlxG.sound.music.time / FlxG.sound.music.length);
-		// addDebugText(curIndex / (data.length / 4));
-		// addDebugText((data.length / 4) / musicSrc.buffer.sampleRate);
-		// addDebugText(FlxG.sound.music.length / 1000);
-		super.update(elapsed);
-
 		if (FlxG.keys.justPressed.SPACE)
 		{
-			#if instrument
-			// instrument.coverage.Coverage.endCoverage(); // when measuring coverage
-			instrument.profiler.Profiler.endProfiler(); // when profiling
-			#end
+			if (FlxG.sound.music.playing)
+			{
+				FlxG.sound.music.pause();
+			}
+			else
+			{
+				FlxG.sound.music.resume();
+			}
 		}
-	}
 
-	function addDebugText(text:Dynamic)
-	{
-		debugText.text += "\n";
-		debugText.text += "" + text;
-	}
-
-	/**
-	 * Returns an array of song names to use for music list
-	 * @param listPath file path to the txt file
-	 * @return An array of song names from the txt file
-	 */
-	function fillMusicList(listPath:String):Array<String>
-	{
-		return Assets.getText(listPath).split("\n").map(str -> str.trim());
+		super.update(elapsed);
 	}
 }
