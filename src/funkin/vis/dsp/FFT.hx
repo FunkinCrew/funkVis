@@ -1,246 +1,280 @@
 package funkin.vis.dsp;
 
-import funkin.vis.dsp.Complex;
 import haxe.ds.Vector;
 
-// these are only used for testing, down in FFT.main()
-using funkin.vis.dsp.OffsetArray;
-using funkin.vis.dsp.Signal;
-
-
 /**
-	Fast/Finite Fourier Transforms.
-**/
-class FFT {
+ * A Radix-2 FFT that turns a frame of audio samples into a magnitude spectrum.
+ * 
+ * @see https://github.com/osakared/grig.audio/blob/main/src/grig/audio/FFT.hx
+ */
+class FFT
+{
+	@:noCompletion
+	private static final TWO_PI:Float = 2 * Math.PI;
+
+	@:noCompletion
+	private final frameSize:Int;
+
+	@:noCompletion
+	private final halfSize:Int;
+
+	@:noCompletion
+	private final windowTable:Vector<Float>;
+
+	@:noCompletion
+	private final bitReversal:Vector<Int>;
+
+	@:noCompletion
+	private final twiddleReal:Vector<Float>;
+
+	@:noCompletion
+	private final twiddleImag:Vector<Float>;
+
+	@:noCompletion
+	private final splitReal:Vector<Float>;
+
+	@:noCompletion
+	private final splitImag:Vector<Float>;
+
+	@:noCompletion
+	private final real:Vector<Float>;
+
+	@:noCompletion
+	private final imag:Vector<Float>;
+
+	@:noCompletion
+	private final magnitudes:Array<Float>;
+
 	/**
-		Computes the Discrete Fourier Transform (DFT) of a `Complex` sequence.
+	 * Initializes an FFT object.
+	 * 
+	 * @param frameSize The number of samples per frame. Must be a power of two and at least 4.
+	 */
+	public function new(frameSize:Int = 512):Void
+	{
+		if (frameSize < 4 || (frameSize & (frameSize - 1)) != 0)
+		{
+			throw 'FFT size must be a power of two >= 4 (got $frameSize)';
+		}
 
-		If the input has N data points (N should be a power of 2 or padding will be added)
-		from a signal sampled at intervals of 1/Fs, the result will be a sequence of N
-		samples from the Discrete-Time Fourier Transform (DTFT) - which is Fs-periodic -
-		with a spacing of Fs/N Hz between them and a scaling factor of Fs.
-	**/
-	public static function fft(input:Array<Complex>) : Array<Complex>
-		return do_fft(input, false);
+		this.frameSize = frameSize;
+		this.halfSize = frameSize >> 1;
+		this.windowTable = new Vector<Float>(frameSize);
+		this.bitReversal = new Vector<Int>(halfSize);
+		this.twiddleReal = new Vector<Float>(halfSize);
+		this.twiddleImag = new Vector<Float>(halfSize);
+		this.splitReal = new Vector<Float>((halfSize >> 1) + 1);
+		this.splitImag = new Vector<Float>((halfSize >> 1) + 1);
+		this.real = new Vector<Float>(halfSize);
+		this.imag = new Vector<Float>(halfSize);
+		this.magnitudes = [for (_ in 0...halfSize) 0];
 
-	/**
-		Like `fft`, but for a real (Float) sequence input.
-
-		Since the input time signal is real, its frequency representation is
-		Hermitian-symmetric so we only return the positive frequencies.
-	**/
-	public static function rfft(input:Array<Float>) : Array<Complex> {
-		// checkAndComputeTwiddles(input.length);
-		final s = fft(input.map(Complex.fromReal));
-		return s.slice(0, Std.int(s.length / 2) + 1);
+		generateTables();
 	}
 
 	/**
-		Computes the Inverse DFT of a periodic input sequence.
+	 * Calculates the magnitude spectrum of a frame of samples.
+	 * 
+	 * @param data The samples to analyse. Only the first `frameSize` are read.
+	 * @return The magnitudes of bins 1 to `frameSize / 2`. The same array is reused on every call, so copy it to keep a frame.
+	 */
+	public function calcFreq(data:Vector<Float>):Array<Float>
+	{
+		final quarterSize:Int = halfSize >> 1;
 
-		If the input contains N (a power of 2) DTFT samples, each spaced Fs/N Hz
-		from each other, the result will consist of N data points as sampled
-		from a time signal at intervals of 1/Fs with a scaling factor of 1/Fs.
-	**/
-	public static function ifft(input:Array<Complex>) : Array<Complex>
-		return do_fft(input, true);
+		for (index in 0...halfSize)
+		{
+			final target:Int = bitReversal[index];
+			final sampleIndex:Int = index << 1;
 
-	// Handles padding and scaling for forwards and inverse FFTs.
-	private static function do_fft(input:Array<Complex>, inverse:Bool) : Array<Complex> {
-		final n = nextPow2(input.length);
-		var ts = [for (i in 0...n) if (i < input.length) input[i] else Complex.zero];
-		var fs = [for (_ in 0...n) Complex.zero];
+			real[target] = data[sampleIndex] * windowTable[sampleIndex];
+			imag[target] = data[sampleIndex + 1] * windowTable[sampleIndex + 1];
+		}
 
-		if (inverse && twiddleFactorsInversed?.length != n)
-			precomputeTwiddleFactors(n, true);
-		else if (!inverse && twiddleFactors?.length != n)
-			precomputeTwiddleFactors(n, false);
+		doFFT();
 
-		ditfft4(ts, 0, fs, 0, n, 1, inverse);
-		return inverse ? fs.map(z -> z.scale(1 / n)) : fs;
+		final scale:Float = 2.0 / frameSize;
+
+		for (bin in 1...quarterSize)
+		{
+			final lowReal:Float = real[bin];
+			final lowImag:Float = imag[bin];
+			final mirrorReal:Float = real[halfSize - bin];
+			final mirrorImag:Float = imag[halfSize - bin];
+			final evenReal:Float = (lowReal + mirrorReal) * 0.5;
+			final evenImag:Float = (lowImag - mirrorImag) * 0.5;
+			final diffReal:Float = (lowReal - mirrorReal) * 0.5;
+			final diffImag:Float = (lowImag + mirrorImag) * 0.5;
+			final cosine:Float = splitReal[bin];
+			final sine:Float = splitImag[bin];
+			final rotatedReal:Float = cosine * diffImag + sine * diffReal;
+			final rotatedImag:Float = sine * diffImag - cosine * diffReal;
+			final binReal:Float = evenReal + rotatedReal;
+			final binImag:Float = evenImag + rotatedImag;
+			final mirrorBinReal:Float = evenReal - rotatedReal;
+			final mirrorBinImag:Float = evenImag - rotatedImag;
+
+			magnitudes[bin - 1] = scale * Math.sqrt(binReal * binReal + binImag * binImag);
+			magnitudes[halfSize - bin - 1] = scale * Math.sqrt(mirrorBinReal * mirrorBinReal + mirrorBinImag * mirrorBinImag);
+		}
+
+		final bin:Int = quarterSize;
+		final lowReal:Float = real[bin];
+		final lowImag:Float = imag[bin];
+		final mirrorReal:Float = real[halfSize - bin];
+		final mirrorImag:Float = imag[halfSize - bin];
+		final diffReal:Float = (lowReal - mirrorReal) * 0.5;
+		final diffImag:Float = (lowImag + mirrorImag) * 0.5;
+		final cosine:Float = splitReal[bin];
+		final sine:Float = splitImag[bin];
+		final binReal:Float = (lowReal + mirrorReal) * 0.5 + (cosine * diffImag + sine * diffReal);
+		final binImag:Float = (lowImag - mirrorImag) * 0.5 + (sine * diffImag - cosine * diffReal);
+
+		magnitudes[bin - 1] = scale * Math.sqrt(binReal * binReal + binImag * binImag);
+		magnitudes[halfSize - 1] = Math.abs(real[0] - imag[0]) / frameSize;
+
+		return magnitudes;
 	}
 
+	@:noCompletion
+	private function generateTables():Void
+	{
+		for (i in 0...frameSize)
+		{
+			windowTable[i] = 1 - 0.85 * Math.cos(i * (TWO_PI / frameSize));
+		}
 
-	// Radix-2 Decimation-In-Time variant of Cooley–Tukey's FFT, recursive.
-	private static function ditfft2(
-		time:Array<Complex>, t:Int,
-		freq:Array<Complex>, f:Int,
-		n:Int, step:Int, inverse: Bool
-	) : Void {
-		if (n == 1) {
-			freq[f] = time[t].copy();
-		} else {
-			final halfLen = Std.int(n / 2);
-			ditfft2(time, t,        freq, f,           halfLen, step * 2, inverse);
-			ditfft2(time, t + step, freq, f + halfLen, halfLen, step * 2, inverse);
-			for (k in 0...halfLen) {
-				final twiddle = inverse ? twiddleFactorsInversed[k] : twiddleFactors[k]; 
-				final even = freq[f + k].copy();
-				final odd = freq[f + k + halfLen].copy();
-				freq[f + k]           = even + twiddle * odd;
-				freq[f + k + halfLen] = even - twiddle * odd;
+		var bitCount:Int = 0;
+
+		while ((1 << bitCount) < halfSize)
+		{
+			bitCount++;
+		}
+
+		for (i in 0...halfSize)
+		{
+			var remaining:Int = i;
+			var reversedValue:Int = 0;
+
+			for (_ in 0...bitCount)
+			{
+				reversedValue = (reversedValue << 1) | (remaining & 1);
+				remaining >>= 1;
 			}
+
+			bitReversal[i] = reversedValue;
+		}
+
+		var halfBlock:Int = 1;
+
+		while (halfBlock < halfSize)
+		{
+			for (offset in 0...halfBlock)
+			{
+				final angle:Float = TWO_PI * offset / (2 * halfBlock);
+
+				twiddleReal[halfBlock + offset] = Math.cos(angle);
+
+				twiddleImag[halfBlock + offset] = -Math.sin(angle);
+			}
+
+			halfBlock <<= 1;
+		}
+
+		for (bin in 0...splitReal.length)
+		{
+			final angle:Float = TWO_PI * bin / frameSize;
+
+			splitReal[bin] = Math.cos(angle);
+
+			splitImag[bin] = -Math.sin(angle);
 		}
 	}
 
-	private static function ditfft4(time:Array<Complex>, t:Int, freq:Array<Complex>, f:Int, n:Int, step:Int, inverse:Bool):Void {
-		
-		if (n == 4) {
-			// Base case: Compute the 4-point DFT directly
-			for (k in 0...n) {
-				var sum = Complex.zero;
-				for (j in 0...4) {
-					var twiddle = Complex.exp((inverse ? 1 : -1) * 2 * Math.PI * k / n); 
-					sum += time[t + j * step] * twiddle;
+	@:noCompletion
+	private function doFFT():Void
+	{
+		if (halfSize < 4)
+		{
+			final firstReal:Float = real[0];
+			final firstImag:Float = imag[0];
+			final secondReal:Float = real[1];
+			final secondImag:Float = imag[1];
+
+			real[0] = firstReal + secondReal;
+			imag[0] = firstImag + secondImag;
+			real[1] = firstReal - secondReal;
+			imag[1] = firstImag - secondImag;
+
+			return;
+		}
+
+		var index:Int = 0;
+
+		while (index < halfSize)
+		{
+			final x0Real:Float = real[index];
+			final x0Imag:Float = imag[index];
+			final x1Real:Float = real[index + 1];
+			final x1Imag:Float = imag[index + 1];
+			final x2Real:Float = real[index + 2];
+			final x2Imag:Float = imag[index + 2];
+			final x3Real:Float = real[index + 3];
+			final x3Imag:Float = imag[index + 3];
+			final sum01Real:Float = x0Real + x1Real;
+			final sum01Imag:Float = x0Imag + x1Imag;
+			final diff01Real:Float = x0Real - x1Real;
+			final diff01Imag:Float = x0Imag - x1Imag;
+			final sum23Real:Float = x2Real + x3Real;
+			final sum23Imag:Float = x2Imag + x3Imag;
+			final diff23Real:Float = x2Real - x3Real;
+			final diff23Imag:Float = x2Imag - x3Imag;
+
+			real[index] = sum01Real + sum23Real;
+			imag[index] = sum01Imag + sum23Imag;
+			real[index + 2] = sum01Real - sum23Real;
+			imag[index + 2] = sum01Imag - sum23Imag;
+			real[index + 1] = diff01Real + diff23Imag;
+			imag[index + 1] = diff01Imag - diff23Real;
+			real[index + 3] = diff01Real - diff23Imag;
+			imag[index + 3] = diff01Imag + diff23Real;
+
+			index += 4;
+		}
+
+		var halfBlock:Int = 4;
+
+		while (halfBlock < halfSize)
+		{
+			final blockSize:Int = halfBlock << 1;
+
+			var blockStart:Int = 0;
+
+			while (blockStart < halfSize)
+			{
+				for (offset in 0...halfBlock)
+				{
+					final weightReal:Float = twiddleReal[halfBlock + offset];
+					final weightImag:Float = twiddleImag[halfBlock + offset];
+					final lowerIndex:Int = blockStart + offset;
+					final upperIndex:Int = lowerIndex + halfBlock;
+					final upperReal:Float = real[upperIndex];
+					final upperImag:Float = imag[upperIndex];
+					final rotatedReal:Float = weightReal * upperReal - weightImag * upperImag;
+					final rotatedImag:Float = weightReal * upperImag + weightImag * upperReal;
+					final lowerReal:Float = real[lowerIndex];
+					final lowerImag:Float = imag[lowerIndex];
+
+					real[lowerIndex] = lowerReal + rotatedReal;
+					imag[lowerIndex] = lowerImag + rotatedImag;
+					real[upperIndex] = lowerReal - rotatedReal;
+					imag[upperIndex] = lowerImag - rotatedImag;
 				}
-				freq[f + k] = sum;
+
+				blockStart += blockSize;
 			}
-		} else {
-			final quarterLen = Std.int(n / 4);
-			ditfft4(time, t, freq, f, quarterLen, step * 4, inverse);
-			ditfft4(time, t + step, freq, f + quarterLen, quarterLen, step * 4, inverse);
-			ditfft4(time, t + 2 * step, freq, f + 2 * quarterLen, quarterLen, step * 4, inverse);
-			ditfft4(time, t + 3 * step, freq, f + 3 * quarterLen, quarterLen, step * 4, inverse);
-	
-			for (k in 0...quarterLen) {
-				final twiddle0 = Complex.exp((inverse ? 1 : -1) * 2 * Math.PI * k / n); 
-				final twiddle1 = Complex.exp((inverse ? 1 : -1) * 2 * Math.PI * k / n); 
-				final twiddle2 = Complex.exp((inverse ? 1 : -1) * 2 * Math.PI * k * 2 / n); 
-				final twiddle3 = Complex.exp((inverse ? 1 : -1) * 2 * Math.PI * k * 3 / n); 
-	
-				final f0 = freq[f + k].copy();
-				final f1 = freq[f + k + quarterLen].copy() * twiddle1;
-				final f2 = freq[f + k + 2 * quarterLen].copy() * twiddle2;
-				final f3 = freq[f + k + 3 * quarterLen].copy() * twiddle3;
-	
-				freq[f + k] = f0 + f1 +  f2 + f3;
-				freq[f + k + quarterLen] = f0 + f1 - f2 - f3;
-				freq[f + k + 2 * quarterLen] = f0 -  f1 - f2 + f3;
-				freq[f + k + 3 * quarterLen] = f0 -  f1 + f2 - f3;
-			}
+
+			halfBlock = blockSize;
 		}
-	}
-
-	// Naive O(n^2) DFT, used for testing purposes.
-	private static function dft(ts:Array<Complex>, ?inverse:Bool) : Array<Complex> {
-		if (inverse == null) inverse = false;
-		final n = ts.length;
-		var fs = new Array<Complex>();
-		fs.resize(n);
-		for (f in 0...n) {
-			var sum = Complex.zero;
-			for (t in 0...n) {
-				sum += ts[t] * Complex.exp((inverse ? 1 : -1) * 2 * Math.PI * f * t / n);
-			}
-			fs[f] = inverse ? sum.scale(1 / n) : sum;
-		}
-		return fs;
-	}
-
-	private static var twiddleFactorsInversed:Array<Complex>;
-
-	private static var twiddleFactors:Array<Complex>;
-
-	private static function precomputeTwiddleFactors(maxN:Int, inverse:Bool):Void
-	{
-		var n:Int = maxN;
-		var base_len = maxN;
-		var len = base_len * (1 << 2);
-		var twiddles:Array<Complex> = [];
-		// for (k in 0...Std.int(n / 2)) { // n/2 because of symmetry
-		// 	var twiddle:Complex = Complex.exp((inverse ? 1 : -1) * 2 * Math.PI * k / n);
-		// 	twiddles.push(twiddle);
-		// }
-
-		
-		// radix2 twiddles
-		for (k in 0...Std.int(n / 2)) { // n/4 because of symmetry in Radix-4
-			var twiddle:Complex = computeTwiddle(k, n, inverse);
-			twiddles.push(twiddle);
-		}
-
-		if (inverse)		
-			twiddleFactorsInversed = twiddles;
-		else		
-			twiddleFactors = twiddles;
-	}
-
-	private static function computeTwiddle(index, fft_len, inverse:Bool = false)
-	{
-		var constant = -2 * Math.PI / fft_len;
-		var angle = constant * index;
-
-		var result:Complex = new Complex(Math.cos(angle), Math.sin(angle));
-
-		if (inverse)
-			return result.conj();
-		else
-			return result;
-	}
-
-	private static function useTwiddleFactor(n:Int, k:Int, inverse:Bool = false):Complex {
-		// Compute the index adjustment based on the FFT size n
-		// var indexAdjustment:Int = Std.int(twiddleFactors.length / (n / 4));
-		var twiddlesToUse = inverse ? twiddleFactorsInversed : twiddleFactors;
-		return twiddlesToUse[k];
-	}
-
-	/**
-		Finds the power of 2 that is equal to or greater than the given natural.
-	**/
-	public static function nextPow2(x:Int) : Int {
-		if (x < 2) return 1;
-		else if ((x & (x-1)) == 0) return x;
-		var pow = 2;
-		x--;
-		while ((x >>= 1) != 0) pow <<= 1;
-		return pow;
-	}
-
-	// testing, but also acts like an example
-	static function main() {
-		// sampling and buffer parameters
-		final Fs = 44100.0;
-		final N = 512;
-		final halfN = Std.int(N / 2);
-
-		// build a time signal as a sum of sinusoids
-		final freqs = [5919.911];
-		final ts = [for (n in 0...N) freqs.map(f -> Math.sin(2 * Math.PI * f * n / Fs)).sum()];
-
-		// get positive spectrum and use its symmetry to reconstruct negative domain
-		final fs_pos = rfft(ts);
-		final fs_fft = new OffsetArray(
-			[for (k in -(halfN - 1) ... 0) fs_pos[-k].conj()].concat(fs_pos),
-			-(halfN - 1)
-		);
-
-		// double-check with naive DFT
-		final fs_dft = new OffsetArray(
-			dft(ts.map(Complex.fromReal)).circShift(halfN - 1),
-			-(halfN - 1)
-		);
-		final fs_err = [for (k in -(halfN - 1) ... halfN) fs_fft[k] - fs_dft[k]];
-		final max_fs_err = fs_err.map(z -> z.magnitude).max();
-		if (max_fs_err > 1e-6) haxe.Log.trace('FT Error: ${max_fs_err}', null);
-
-		// find spectral peaks to detect signal frequencies
-		final freqis = fs_fft.array.map(z -> z.magnitude)
-		                           .findPeaks()
-		                           .map(k -> (k - (halfN - 1)) * Fs / N)
-		                           .filter(f -> f >= 0);
-		if (freqis.length != freqs.length) {
-			trace('Found frequencies: ${freqis}');
-		} else {
-			final freqs_err = [for (i in 0...freqs.length) freqis[i] - freqs[i]];
-			final max_freqs_err = freqs_err.map(Math.abs).max();
-			if (max_freqs_err > Fs / N) trace('Frequency Errors: ${freqs_err}');
-		}
-
-		// recover time signal from the frequency domain
-		final ts_ifft = ifft(fs_fft.array.circShift(-(halfN - 1)).map(z -> z.scale(1 / Fs)));
-		final ts_err = [for (n in 0...N) ts_ifft[n].scale(Fs).real - ts[n]];
-		final max_ts_err = ts_err.map(Math.abs).max();
-		if (max_ts_err > 1e-6) haxe.Log.trace('IFT Error: ${max_ts_err}', null);
 	}
 }

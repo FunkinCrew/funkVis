@@ -1,357 +1,468 @@
 package funkin.vis.dsp;
 
-import flixel.FlxG;
-import flixel.math.FlxMath;
-import funkin.vis._internal.html5.AnalyzerNode;
-import funkin.vis.audioclip.frontends.LimeAudioClip;
-import grig.audio.FFT;
-import grig.audio.FFTVisualization;
+import haxe.ds.Vector;
+
 import lime.media.AudioSource;
+#if (lime_cffi && lime_miniaudio && !macro)
+import lime.media.miniaudio.MAAudioRingBuffer;
+import lime.media.miniaudio.MAAudioRingBufferConfig;
+import lime.media.miniaudio.MAHelpers;
+import lime.utils.Bytes;
+import lime.utils.Float32Array;
+#elseif (js && html5 && lime_howlerjs)
+import js.html.audio.AnalyserNode;
+import js.lib.Float32Array;
 
-using grig.audio.lime.UInt8ArrayTools;
+import lime.media.howlerjs.Howl;
+#end
 
-typedef Bar =
-{
-    var value:Float;
-    var peak:Float;
-}
-
-typedef BarObject =
-{
-	var binLo:Int;
-	var binHi:Int;
-    var freqLo:Float;
-    var freqHi:Float;
-    var recentValues:RecentPeakFinder;
-}
-
-enum MathType
-{
-    Round;
-    Floor;
-    Ceil;
-    Cast;
-}
-
+/** Analyzes the audio of an `AudioSource` and turns it into spectrum bars. */
 class SpectralAnalyzer
 {
-    public var minDb(default, set):Float = -70;
-    public var maxDb(default, set):Float = -20;
-    public var fftN(default, set):Int = 4096;
-    public var minFreq:Float = 50;
-    public var maxFreq:Float = 22000;
-    // Awkwardly, we'll have to interfaces for now because there's too much platform specific stuff we need
-    private var audioSource:AudioSource;
-    private var audioClip:AudioClip;
+	#if (lime_cffi && lime_miniaudio && !macro)
+	@:noCompletion
+	private static final RING_BUFFER_FRAME_MULTIPLIER:Int = 4;
+	#end
+
+	@:noCompletion
+	private static final LOG_GRAPH_RANGE:Int = 16;
+
+	/** Number of samples per analysis frame. Must be a power of two and at least 4. */
+	public var fftN(default, set):Int = 2048;
+
+	/** Lower end of the decibel range. */
+	public var minDb:Float = -70;
+
+	/** Upper end of the decibel range. */
+	public var maxDb:Float = -20;
+
+	/** Lowest frequency shown by the first bar, in Hz. */
+	public var minFreq:Float = 50;
+
+	/** Highest frequency shown by the last bar, in Hz. */
+	public var maxFreq:Float = 22000;
+
+	/** Keeps the last levels while the audio isn't playing. */
+	public var holdLevels:Bool = true;
+
+	@:noCompletion
+	private var audioSource:AudioSource;
+
+	@:noCompletion
 	private var barCount:Int;
-    private var maxDelta:Float;
-    private var peakHold:Int;
-    var fftN2:Int = 2048;
-    #if web
-    private var htmlAnalyzer:AnalyzerNode;
-    private var bars:Array<BarObject> = [];
-    #else
-    private var fft:FFT;
-	private var vis = new FFTVisualization();
-    private var barHistories = new Array<RecentPeakFinder>();
-    private var blackmanWindow = new Array<Float>();
-    #end
-    private var _logGraphCache:Array<Int> = [];
-    private var _mixedCache:Array<Float> = [];
 
-    private function freqToBin(freq:Float, mathType:MathType = Round):Int
-    {
-        var bin = freq * fftN2 / audioClip.audioBuffer.sampleRate;
-        return switch (mathType) {
-            case Round: Math.round(bin);
-            case Floor: Math.floor(bin);
-            case Ceil: Math.ceil(bin);
-            case Cast: Std.int(bin);
-        }
-    }
+	@:noCompletion
+	private var maxDelta:Float;
 
-    function normalizedB(value:Float)
-    {
-        var maxValue = maxDb;
-        var minValue = minDb;
+	@:noCompletion
+	private var peakHold:Int;
 
-        return clamp((value - minValue) / (maxValue - minValue), 0, 1);
-    }
+	@:noCompletion
+	private var fft:FFT;
 
-    function calcBars(barCount:Int, peakHold:Int)
-    {
-        #if web
-        bars = [];
-        var logStep = (LogHelper.log10(maxFreq) - LogHelper.log10(minFreq)) / (barCount);
+	@:noCompletion
+	private var vis:Visualization;
 
-        var scaleMin:Float = Scaling.freqScaleLog(minFreq);
-        var scaleMax:Float = Scaling.freqScaleLog(maxFreq);
+	@:noCompletion
+	private var barHistories:Array<RecentPeakFinder>;
 
-        var curScale:Float = scaleMin;
+	@:noCompletion
+	private var samples:Vector<Float>;
 
-        // var stride = (scaleMax - scaleMin) / bands;
+	@:noCompletion
+	private var sampleRate:Float = 44100;
 
-        for (i in 0...barCount)
-        {
-            var curFreq:Float = Math.pow(10, LogHelper.log10(minFreq) + (logStep * i));
+	@:noCompletion
+	private var spectrumStale:Bool = true;
 
-            var freqLo:Float = curFreq;
-            var freqHi:Float = Math.pow(10, LogHelper.log10(minFreq) + (logStep * (i + 1)));
+	@:noCompletion
+	private var silenced:Bool = false;
 
-            var binLo = freqToBin(freqLo, Floor);
-            var binHi = freqToBin(freqHi);
+	@:noCompletion
+	private var logGraphCache:Array<Int> = [];
 
-            bars.push(
-                {
-                    binLo: binLo,
-                    binHi: binHi,
-                    freqLo: freqLo,
-                    freqHi: freqHi,
-                    recentValues: new RecentPeakFinder(peakHold)
-                });
-        }
+	@:noCompletion
+	private var levelsCache:Array<Bar> = [];
 
-        if (bars[0].freqLo < minFreq)
-        {
-            bars[0].freqLo = minFreq;
-            bars[0].binLo = freqToBin(minFreq, Floor);
-        }
+	#if (lime_cffi && lime_miniaudio && !macro)
+	@:noCompletion
+	private var ringBufferConfig:MAAudioRingBufferConfig;
 
-        if (bars[bars.length - 1].freqHi > maxFreq)
-        {
-            bars[bars.length - 1].freqHi = maxFreq;
-            bars[bars.length - 1].binHi = freqToBin(maxFreq, Floor);
-        }
-        #else
-        if (barCount > barHistories.length) {
-            barHistories.resize(barCount);
-        }
-        for (i in 0...barCount) {
-            if (barHistories[i] == null) barHistories[i] = new RecentPeakFinder();
-        }
-        #end
-    }
+	@:noCompletion
+	private var ringBuffer:MAAudioRingBuffer;
 
-    function resizeBlackmanWindow(size:Int)
-    {
-        #if !web
-        if (blackmanWindow.length == size) return;
-        blackmanWindow.resize(size);
-        for (i in 0...size) {
-            blackmanWindow[i] = calculateBlackmanWindow(i, size);
-        }
-        #end
-    }
+	@:noCompletion
+	private var readBuffer:Float32Array;
 
+	@:noCompletion
+	private var monoCache:Vector<Float>;
+
+	@:noCompletion
+	private var writeIndex:Int = 0;
+	#elseif (js && html5 && lime_howlerjs)
+	@:noCompletion
+	private var howl:Howl;
+
+	@:noCompletion
+	private var analyzer:AnalyserNode;
+
+	@:noCompletion
+	private var timeBuffer:Float32Array;
+	#end
+
+	/**
+	 * Initializes a SpectralAnalyzer object.
+	 * 
+	 * @param audioSource The audio source to analyze.
+	 * @param barCount The number of bars to produce.
+	 * @param maxDelta The maximum amount a bar's value can change per update. Use `0` to disable the limit.
+	 * @param peakHold The number of recent updates each bar's peak is tracked over.
+	 */
 	public function new(audioSource:AudioSource, barCount:Int, maxDelta:Float = 0.01, peakHold:Int = 30)
 	{
-        this.audioSource = audioSource;
-		this.audioClip = new LimeAudioClip(audioSource);
+		this.audioSource = audioSource;
 		this.barCount = barCount;
-        this.maxDelta = maxDelta;
-        this.peakHold = peakHold;
+		this.maxDelta = maxDelta;
+		this.peakHold = peakHold;
 
-        #if web
-        htmlAnalyzer = new AnalyzerNode(audioClip);
-        #else
-        fft = new FFT(fftN);
-        #end
+		vis = new Visualization();
 
-        calcBars(barCount, peakHold);
-        resizeBlackmanWindow(fftN);
+		barHistories = [];
+
+		#if (js && html5 && lime_howlerjs)
+		howl = @:privateAccess audioSource.buffer.__srcHowl;
+
+		sampleRate = untyped howl._sounds[0]._node.context.sampleRate;
+
+		analyzer = new AnalyserNode(untyped howl._sounds[0]._node.context);
+
+		untyped howl._sounds[0]._node.connect(analyzer);
+		#end
+
+		rebuild();
+
+		calcBars(barCount);
 	}
 
+	/**
+	 * Gets the current level of every bar.
+	 * 
+	 * @param levels (Optional) The array to fill. When omitted, an internal array is reused between calls.
+	 * @return The bars, ordered from the lowest frequency to the highest.
+	 */
 	public function getLevels(?levels:Array<Bar>):Array<Bar>
 	{
-        if(levels == null) levels = new Array<Bar>();
-        #if web
-        var amplitudes:Array<Float> = htmlAnalyzer.getFloatFrequencyData();
-
-        for (i in 0...bars.length) {
-            var bar = bars[i];
-            var binLo = bar.binLo;
-            var binHi = bar.binHi;
-
-            var value:Float = minDb;
-            for (j in (binLo + 1)...(binHi)) {
-                value = Math.max(value, amplitudes[Std.int(j)]);
-            }
-
-            // this isn't for clamping, it's to get a value
-            // between 0 and 1!
-            value = normalizedB(value);
-            bar.recentValues.push(value);
-            var recentPeak = bar.recentValues.peak;
-
-            if(levels[i] != null)
-            {
-                levels[i].value = value;
-                levels[i].peak = recentPeak;
-            }
-            else levels.push({value: value, peak: recentPeak});
-        }
-
-        return levels;
-        #else
-        var data:lime.utils.Int16Array = cast audioSource.buffer.data;
-        var numOctets = Std.int(audioSource.buffer.bitsPerSample / 8);
-        var channels = audioSource.buffer.channels;
-        var wantedLength = fftN * numOctets * channels;
-        var startFrame = audioClip.currentFrame;
-
-        if (startFrame < 0)
-            return levels = [for (bar in 0...barCount) {value: 0, peak: 0}];
-
-        var dataLength = data.length;
-
-        // Make sure its a goddamn complete frame!
-        var frameSize = numOctets * channels;
-        var startByte = startFrame - (startFrame % frameSize);
-
-        if (startByte >= dataLength)
-            return levels = [for (bar in 0...barCount) {value: 0, peak: 0}];
-
-        var endByte = min(startByte + wantedLength, dataLength);
-
-        var segment = data.subarray(startByte, endByte);
-		getSignal(segment, audioSource.buffer.bitsPerSample); // Sets _buffer
-
-		if (audioSource.buffer.channels > 1) {
-            var wantedArrayLength = Std.int(_buffer.length / audioSource.buffer.channels);
-            if (_mixedCache.length != wantedArrayLength)
-			    _mixedCache.resize(wantedArrayLength);
-
-			for (i in 0..._mixedCache.length) {
-				_mixedCache[i] = 0.0;
-				for (c in 0...audioSource.buffer.channels) {
-					_mixedCache[i] += 0.7 * _buffer[i*audioSource.buffer.channels+c];
-				}
-                _mixedCache[i] *= blackmanWindow[i];
-			}
-			//_buffer = _mixedCache;
-		}
-
-		var range = 16;
-        var freqs = fft.calcFreq(_mixedCache);
-
-		_logGraphCache = vis.makeLogGraph(freqs, barCount + 1, Math.floor(maxDb - minDb), range, _logGraphCache);
-
-        /*if (_logGraphCache.length - 1 > barHistories.length) {
-            barHistories.resize(_logGraphCache.length - 1);
-        }*/
-        // levels.resize(_logGraphCache.length-1);
-
-        for (i in 0..._logGraphCache.length-1) {
-
-            if (barHistories[i] == null) barHistories[i] = new RecentPeakFinder();
-            var recentValues = barHistories[i];
-            var value = _logGraphCache[i] / range;
-
-            // slew limiting
-            var lastValue = recentValues.lastValue;
-            if (maxDelta > 0.0) {
-                var delta = clamp(value - lastValue, -1 * maxDelta, maxDelta);
-                value = lastValue + delta;
-            }
-            recentValues.push(value);
-
-            var recentPeak = recentValues.peak;
-
-            if(levels[i] != null)
-            {
-                levels[i].value = value;
-                levels[i].peak = recentPeak;
-            }
-            else levels[i] = {value: value, peak: recentPeak};
-        }
-        return levels;
-        #end
+		return computeLevels(levels ?? levelsCache);
 	}
 
-    // Prevents a memory leak by reusing array
-    var _buffer:Array<Float> = [];
-	function getSignal(data:lime.utils.UInt8Array, bitsPerSample:Int):Array<Float>
-    {
-        switch(bitsPerSample)
-        {
-            case 8:
-                _buffer.resize(data.length);
-                for (i in 0...data.length)
-                    _buffer[i] = data[i] / 128.0;
+	/** Frees the audio resources used by the analyzer. */
+	public function dispose():Void
+	{
+		#if (lime_cffi && lime_miniaudio && !macro)
+		if (ringBuffer != null)
+		{
+			audioSource.removeRingBuffer(ringBuffer);
+			ringBuffer.uninit();
+			ringBuffer = null;
+		}
 
-            case 16:
-                _buffer.resize(Std.int(data.length / 2));
-                for (i in 0..._buffer.length)
-                    _buffer[i] = data.getInt16(i * 2) / 32767.0;
+		readBuffer = null;
+		#elseif (js && html5 && lime_howlerjs)
+		if (analyzer != null)
+		{
+			untyped howl._sounds[0]._node.disconnect(analyzer);
+			analyzer = null;
+		}
 
-            case 24:
-                _buffer.resize(Std.int(data.length / 3));
-                for (i in 0..._buffer.length)
-                    _buffer[i] = data.getInt24(i * 3) / 8388607.0;
+		timeBuffer = null;
+		#end
+	}
 
-            case 32:
-                _buffer.resize(Std.int(data.length / 4));
-                for (i in 0..._buffer.length)
-                    _buffer[i] = data.getInt32(i * 4) / 2147483647.0;
+	@:noCompletion
+	private function computeLevels(levels:Array<Bar>):Array<Bar>
+	{
+		#if (lime_cffi && lime_miniaudio && !macro)
+		if (ringBuffer == null)
+		{
+			return levels;
+		}
+		#elseif (js && html5 && lime_howlerjs)
+		if (analyzer == null)
+		{
+			return levels;
+		}
+		#end
 
-            default: trace('Unknown integer audio format');
-        }
-        return _buffer;
-    }
+		captureSamples();
 
-    @:generic
-    static inline function clamp<T:Float>(val:T, min:T, max:T):T
-    {
-        return val <= min ? min : val >= max ? max : val;
-    }
+		if (spectrumStale)
+		{
+			final binHz:Float = sampleRate / fftN;
 
-    static function calculateBlackmanWindow(n:Int, fftN:Int)
-    {
-		return 0.42 - 0.50 * Math.cos(2 * Math.PI * n / (fftN - 1)) + 0.08 * Math.cos(4 * Math.PI * n / (fftN - 1));
-    }
+			logGraphCache = vis.makeLogGraph(fft.calcFreq(samples), barCount + 1, Std.int(maxDb - minDb), LOG_GRAPH_RANGE, logGraphCache, minFreq / binHz,
+				maxFreq / binHz);
 
-    @:generic
-    static public inline function min<T:Float>(x:T, y:T):T
-    {
-        return x > y ? y : x;
-    }
+			spectrumStale = false;
+		}
 
-    function set_minDb(value:Float):Float
-    {
-        minDb = value;
+		for (i in 0...logGraphCache.length - 1)
+		{
+			var history:RecentPeakFinder = barHistories[i] ??= new RecentPeakFinder(peakHold);
 
-        #if web
-        htmlAnalyzer.minDecibels = value;
-        #end
+			var value:Float = logGraphCache[i] / LOG_GRAPH_RANGE;
 
-        return value;
-    }
+			if (maxDelta > 0)
+			{
+				final diff:Float = value - history.lastValue;
 
-    function set_maxDb(value:Float):Float
-    {
-        maxDb = value;
+				if (diff < -maxDelta)
+				{
+					value = history.lastValue - maxDelta;
+				}
+				else if (diff > maxDelta)
+				{
+					value = history.lastValue + maxDelta;
+				}
+			}
 
-        #if web
-        htmlAnalyzer.maxDecibels = value;
-        #end
+			history.push(value);
 
-        return value;
-    }
+			var bar:Bar = levels[i];
 
-    function set_fftN(value:Int):Int
-    {
-        fftN = value;
-        var pow2 = FFT.nextPow2(value);
-        fftN2 = Std.int(pow2 / 2);
+			if (bar != null)
+			{
+				bar.value = value;
+				bar.peak = history.peak;
+			}
+			else
+			{
+				levels[i] = {value: value, peak: history.peak};
+			}
+		}
 
-        #if web
-        htmlAnalyzer.fftSize = pow2;
-        #else
-        fft = new FFT(value);
-        #end
+		return levels;
+	}
 
-        calcBars(barCount, peakHold);
-        resizeBlackmanWindow(fftN);
-        return pow2;
-    }
+	@:noCompletion
+	private function captureSamples():Void
+	{
+		#if (lime_cffi && lime_miniaudio && !macro)
+		final availableFrames:Int = ringBuffer.get_length_in_pcm_frames();
+
+		if (availableFrames <= 0)
+		{
+			if (holdLevels || silenced || audioSource.playing)
+			{
+				return;
+			}
+
+			clearSamples();
+
+			return;
+		}
+
+		silenced = false;
+
+		final configSize:Int = ringBufferConfig.sizeInFrames;
+
+		final framesToRead:Int = availableFrames > configSize ? configSize : availableFrames;
+
+		ringBuffer.read_pcm_frames(#if cpp cpp.Pointer.ofArray(readBuffer.buffer.getData()) #else null #end, framesToRead);
+
+		pushFrames(framesToRead);
+
+		reorderRingBufferToSamples();
+
+		spectrumStale = true;
+		#elseif (js && html5 && lime_howlerjs)
+		if (!audioSource.playing)
+		{
+			if (holdLevels || silenced)
+			{
+				return;
+			}
+
+			clearSamples();
+
+			return;
+		}
+
+		silenced = false;
+
+		analyzer.getFloatTimeDomainData(timeBuffer);
+
+		final src:Float32Array = timeBuffer;
+		final dst:Vector<Float> = samples;
+
+		for (i in 0...fftN)
+		{
+			dst[i] = src[i];
+		}
+
+		spectrumStale = true;
+		#end
+	}
+
+	@:noCompletion
+	private function clearSamples():Void
+	{
+		#if (lime_cffi && lime_miniaudio && !macro)
+		for (i in 0...fftN)
+		{
+			monoCache[i] = 0;
+		}
+
+		reorderRingBufferToSamples();
+		#elseif (js && html5 && lime_howlerjs)
+		for (i in 0...fftN)
+		{
+			samples[i] = 0;
+		}
+		#end
+
+		silenced = true;
+
+		spectrumStale = true;
+	}
+
+	@:noCompletion
+	private function rebuild():Void
+	{
+		fft = new FFT(fftN);
+		samples = new Vector<Float>(fftN, 0);
+		spectrumStale = true;
+
+		#if (lime_cffi && lime_miniaudio && !macro)
+		createRingBuffer();
+		#elseif (js && html5 && lime_howlerjs)
+		analyzer.fftSize = fftN;
+		timeBuffer = new Float32Array(fftN);
+		#end
+	}
+
+	@:noCompletion
+	private function calcBars(barCount:Int):Void
+	{
+		if (barCount > barHistories.length)
+		{
+			barHistories.resize(barCount);
+		}
+
+		for (i in 0...barCount)
+		{
+			barHistories[i] ??= new RecentPeakFinder(peakHold);
+		}
+	}
+
+	#if (lime_cffi && lime_miniaudio && !macro)
+	@:noCompletion
+	private function createRingBuffer():Void
+	{
+		if (audioSource != null)
+		{
+			if (ringBuffer != null)
+			{
+				audioSource.removeRingBuffer(ringBuffer);
+				ringBuffer.uninit();
+				ringBuffer = null;
+			}
+
+			sampleRate = audioSource.buffer.sampleRate;
+
+			final sizeInFrames:Int = fftN * RING_BUFFER_FRAME_MULTIPLIER;
+
+			ringBufferConfig = MAAudioRingBufferConfig.init(F32, audioSource.buffer.channels, audioSource.buffer.sampleRate, sizeInFrames);
+			ringBuffer = MAAudioRingBuffer.init(ringBufferConfig);
+			readBuffer = new Float32Array(Bytes.alloc(ringBufferConfig.sizeInFrames * ringBufferConfig.channels * MAHelpers.get_bytes_per_sample(F32)));
+			monoCache = new Vector<Float>(fftN, 0);
+			writeIndex = 0;
+
+			audioSource.addRingBuffer(ringBuffer);
+		}
+	}
+
+	@:noCompletion
+	private function pushFrames(frames:Int):Void
+	{
+		final take:Int = frames > fftN ? fftN : frames;
+		final channels:Int = ringBufferConfig.channels;
+		final src:Float32Array = readBuffer;
+		final dst:Vector<Float> = monoCache;
+		final size:Int = fftN;
+
+		var index:Int = (frames - take) * channels;
+		var w:Int = writeIndex;
+
+		if (channels == 2)
+		{
+			for (_ in 0...take)
+			{
+				dst[w] = (src[index] + src[index + 1]) * 0.5;
+
+				index += 2;
+
+				if (++w == size)
+					w = 0;
+			}
+		}
+		else if (channels == 1)
+		{
+			for (_ in 0...take)
+			{
+				dst[w] = src[index];
+
+				index++;
+
+				if (++w == size)
+					w = 0;
+			}
+		}
+		else
+		{
+			for (_ in 0...take)
+			{
+				var mixed:Float = 0;
+
+				for (c in 0...channels)
+				{
+					mixed += src[index + c];
+				}
+
+				dst[w] = mixed / channels;
+
+				index += channels;
+
+				if (++w == size)
+					w = 0;
+			}
+		}
+
+		writeIndex = w;
+	}
+
+	@:noCompletion
+	private function reorderRingBufferToSamples():Void
+	{
+		final tail:Int = fftN - writeIndex;
+
+		Vector.blit(monoCache, writeIndex, samples, 0, tail);
+
+		Vector.blit(monoCache, 0, samples, tail, writeIndex);
+	}
+	#end
+
+	@:noCompletion
+	private function set_fftN(value:Int):Int
+	{
+		if (value == fftN)
+		{
+			return value;
+		}
+
+		fftN = value;
+
+		rebuild();
+
+		return value;
+	}
 }
