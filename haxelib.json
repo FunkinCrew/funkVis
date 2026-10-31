@@ -4,10 +4,12 @@
     "license": "MIT",
     "description": "Haxe FFT visulization stuff",
     "classPath": "src",
-    "tags": ["audio", "fft", "visualization"],
+    "tags": [
+        "audio",
+        "fft",
+        "visualization"
+    ],
     "releasenote": "Initial release",
     "version": "0.0.1",
-    "dependencies": {
-        
-    }
+    "dependencies": {}
 }
