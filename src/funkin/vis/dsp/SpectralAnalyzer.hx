@@ -168,7 +168,7 @@ class SpectralAnalyzer
 		#if (lime_cffi && lime_miniaudio && !macro)
 		if (ringBuffer != null)
 		{
-			audioSource.removeRingBuffer(ringBuffer);
+			audioSource.removePreRingBuffer(ringBuffer);
 			ringBuffer.uninit();
 			ringBuffer = null;
 		}
@@ -374,7 +374,7 @@ class SpectralAnalyzer
 		{
 			if (ringBuffer != null)
 			{
-				audioSource.removeRingBuffer(ringBuffer);
+				audioSource.removePreRingBuffer(ringBuffer);
 				ringBuffer.uninit();
 				ringBuffer = null;
 			}
@@ -389,7 +389,7 @@ class SpectralAnalyzer
 			monoCache = new Vector<Float>(fftN, 0);
 			writeIndex = 0;
 
-			audioSource.addRingBuffer(ringBuffer);
+			audioSource.addPreRingBuffer(ringBuffer);
 		}
 	}
 
