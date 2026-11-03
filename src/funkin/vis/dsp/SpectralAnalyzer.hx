@@ -11,6 +11,8 @@ import lime.utils.Bytes;
 import lime.utils.Float32Array;
 #elseif (js && html5 && lime_howlerjs)
 import js.html.audio.AnalyserNode;
+import js.html.audio.AudioBufferSourceNode;
+import js.html.audio.GainNode;
 import js.lib.Float32Array;
 
 import lime.media.howlerjs.Howl;
@@ -136,7 +138,12 @@ class SpectralAnalyzer
 
 		analyzer = new AnalyserNode(untyped howl._sounds[0]._node.context);
 
-		untyped howl._sounds[0]._node.connect(analyzer);
+		if (audioSource.playing)
+		{
+			connectAnalyzer();
+		}
+
+		howl.on("play", connectAnalyzer);
 		#end
 
 		rebuild();
@@ -168,9 +175,14 @@ class SpectralAnalyzer
 
 		readBuffer = null;
 		#elseif (js && html5 && lime_howlerjs)
+		if (howl != null)
+		{
+			howl.off("play", connectAnalyzer);
+		}
+
 		if (analyzer != null)
 		{
-			untyped howl._sounds[0]._node.disconnect(analyzer);
+			analyzer.disconnect();
 			analyzer = null;
 		}
 
@@ -448,6 +460,29 @@ class SpectralAnalyzer
 		Vector.blit(monoCache, writeIndex, samples, 0, tail);
 
 		Vector.blit(monoCache, 0, samples, tail, writeIndex);
+	}
+	#elseif (js && html5 && lime_howlerjs)
+	@:noCompletion
+	private function connectAnalyzer():Void
+	{
+		if (analyzer != null)
+		{
+			final gainNode:GainNode = untyped howl._sounds[0]._node;
+
+			if (gainNode != null)
+			{
+				final bufferSource:AudioBufferSourceNode = untyped gainNode.bufferSource;
+
+				if (bufferSource != null)
+				{
+					bufferSource.connect(analyzer);
+				}
+				else
+				{
+					gainNode.connect(analyzer);
+				}
+			}
+		}
 	}
 	#end
 
