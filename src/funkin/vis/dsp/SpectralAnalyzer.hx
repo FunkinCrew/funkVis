@@ -122,6 +122,11 @@ class SpectralAnalyzer
 	 */
 	public function new(audioSource:AudioSource, barCount:Int, maxDelta:Float = 0.01, peakHold:Int = 30)
 	{
+		if (audioSource == null || audioSource.buffer == null)
+		{
+			throw "The audio source needs to have an valid audio buffer";
+		}
+
 		this.audioSource = audioSource;
 		this.barCount = barCount;
 		this.maxDelta = maxDelta;
