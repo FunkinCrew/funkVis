@@ -16,6 +16,7 @@ import js.html.audio.GainNode;
 import js.lib.Float32Array;
 
 import lime.media.howlerjs.Howl;
+import lime.media.howlerjs.Howler;
 #end
 
 /** Analyzes the audio of an `AudioSource` and turns it into spectrum bars. */
@@ -139,9 +140,9 @@ class SpectralAnalyzer
 		#if (js && html5 && lime_howlerjs)
 		howl = @:privateAccess audioSource.buffer.__srcHowl;
 
-		sampleRate = untyped howl._sounds[0]._node.context.sampleRate;
+		sampleRate = Howler.ctx.sampleRate;
 
-		analyzer = new AnalyserNode(untyped howl._sounds[0]._node.context);
+		analyzer = new AnalyserNode(Howler.ctx);
 
 		if (audioSource.playing)
 		{
@@ -472,19 +473,24 @@ class SpectralAnalyzer
 	{
 		if (analyzer != null)
 		{
-			final gainNode:GainNode = untyped howl._sounds[0]._node;
+			final sound:Dynamic = untyped howl._soundById(audioSource.__backend.handle);
 
-			if (gainNode != null)
+			if (sound != null && sound._node != null)
 			{
-				final bufferSource:AudioBufferSourceNode = untyped gainNode.bufferSource;
+				final gainNode:GainNode = untyped sound._node;
 
-				if (bufferSource != null)
+				if (gainNode != null)
 				{
-					bufferSource.connect(analyzer);
-				}
-				else
-				{
-					gainNode.connect(analyzer);
+					final bufferSource:AudioBufferSourceNode = untyped gainNode.bufferSource;
+
+					if (bufferSource != null)
+					{
+						bufferSource.connect(analyzer);
+					}
+					else
+					{
+						gainNode.connect(analyzer);
+					}
 				}
 			}
 		}
